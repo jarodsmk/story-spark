@@ -28,16 +28,22 @@ To build the standalone Tauri 2 desktop executable (requires Rust and Cargo inst
 npm run tauri dev
 ```
 
-### Running with Docker
+### Running with Docker Compose (with MongoDB)
 
-Build and run the containerized application locally on port 8080:
+To spin up the entire containerized stack including the persistent MongoDB service:
+
+```bash
+docker compose up -d --build
+```
+
+Access StorySpark at `http://localhost:8080`. All scenes, characters, bible entries, and configuration will automatically persist to the dedicated MongoDB instance.
+
+### Running with Standalone Docker
 
 ```bash
 docker build -t story-spark:latest .
 docker run -d -p 8080:80 --name story-spark story-spark:latest
 ```
-
-Access StorySpark at `http://localhost:8080`.
 
 
 ---

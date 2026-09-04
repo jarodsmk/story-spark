@@ -10,14 +10,16 @@ export interface FileItem {
 class LocalFilesystem {
   private isTauri: boolean;
   private memoryStore: Map<string, string> = new Map();
+  private apiBaseUrl: string;
 
   constructor() {
     this.isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+    this.apiBaseUrl = import.meta.env?.VITE_API_BASE_URL || 'http://localhost:3001';
     this.initDefaultProject();
   }
 
   private initDefaultProject() {
-    const saved = localStorage.getItem('storyspark_fs_backup');
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('storyspark_fs_backup') : null;
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -49,6 +51,7 @@ class LocalFilesystem {
   }
 
   private persistStore() {
+    if (typeof localStorage === 'undefined') return;
     const obj: Record<string, string> = {};
     for (const [k, v] of this.memoryStore.entries()) {
       obj[k] = v;
@@ -67,6 +70,21 @@ class LocalFilesystem {
       } catch (err) {
         console.warn('Tauri invoke failed, falling back:', err);
       }
+    }
+
+    // Attempt to fetch from MongoDB API
+    try {
+      const resp = await fetch(`${this.apiBaseUrl}/api/files/${relativePath}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data && typeof data.content === 'string') {
+          this.memoryStore.set(relativePath, data.content);
+          this.persistStore();
+          return data.content;
+        }
+      }
+    } catch {
+      // Offline fallback
     }
 
     const content = this.memoryStore.get(relativePath);
@@ -92,6 +110,17 @@ class LocalFilesystem {
       }
     }
 
+    // Persist to MongoDB API
+    try {
+      await fetch(`${this.apiBaseUrl}/api/files/${cleanPath}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      });
+    } catch {
+      // Offline fallback
+    }
+
     this.memoryStore.set(cleanPath, content);
     this.persistStore();
     return true;
@@ -111,9 +140,43 @@ class LocalFilesystem {
       }
     }
 
-    const results: FileItem[] = [];
     const prefix = categoryDir.endsWith('/') ? categoryDir : `${categoryDir}/`;
 
+    // Attempt to list from MongoDB API
+    try {
+      const resp = await fetch(`${this.apiBaseUrl}/api/files?prefix=${encodeURIComponent(prefix)}`);
+      if (resp.ok) {
+        const files: Array<{ path: string; content?: string }> = await resp.json();
+        if (Array.isArray(files) && files.length > 0) {
+          const results: FileItem[] = [];
+          for (const f of files) {
+            if (f.path.startsWith(prefix)) {
+              const filename = f.path.slice(prefix.length);
+              if (!filename.includes('/')) {
+                const len = f.content ? f.content.length : 0;
+                results.push({
+                  name: filename,
+                  path: f.path,
+                  is_dir: false,
+                  size: len,
+                });
+                if (f.content !== undefined) {
+                  this.memoryStore.set(f.path, f.content);
+                }
+              }
+            }
+          }
+          if (results.length > 0) {
+            this.persistStore();
+            return results.sort((a, b) => a.name.localeCompare(b.name));
+          }
+        }
+      }
+    } catch {
+      // Local fallback
+    }
+
+    const results: FileItem[] = [];
     for (const [path, content] of this.memoryStore.entries()) {
       if (path.startsWith(prefix)) {
         const filename = path.slice(prefix.length);
@@ -142,6 +205,15 @@ class LocalFilesystem {
       } catch (err) {
         console.warn('Tauri delete failed:', err);
       }
+    }
+
+    // Delete in MongoDB API
+    try {
+      await fetch(`${this.apiBaseUrl}/api/files/${relativePath}`, {
+        method: 'DELETE',
+      });
+    } catch {
+      // Local fallback
     }
 
     const res = this.memoryStore.delete(relativePath);
