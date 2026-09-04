@@ -2,6 +2,8 @@
 
 **StorySpark** is a private, local-first author studio and replacement for Novelcrafter built with **Tauri 2, React, TypeScript, SQLite, and a Rust filesystem layer**.
 
+<img width="2076" height="934" alt="image" src="https://github.com/user-attachments/assets/bb041ece-a898-4206-bdd2-b03658c71f2f" />
+
 StorySpark is designed specifically for fiction writers who want:
 - **Zero manuscript uploads**: The whole project remains entirely on your machine.
 - **Three-pane authoring workspace**: Source manuscript text, suggestion/drafting passes, and live accepted diff preview.
