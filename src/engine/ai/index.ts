@@ -18,7 +18,7 @@ export async function rewritePassage(
     throw new Error('Please select text to rewrite.');
   }
 
-  const baseUrl = (settings.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
+  const baseUrl = (settings.baseUrl || 'https://openrouter.ai/api/v1').replace(/\/+$/, '');
   const url = `${baseUrl}/chat/completions`;
 
   const systemMessage = settings.systemPrompt || 
@@ -45,7 +45,7 @@ export async function rewritePassage(
       method: 'POST',
       headers,
       body: JSON.stringify({
-        model: settings.model || 'gpt-4o-mini',
+        model: settings.model || 'microsoft/wizardlm-2-8x22b',
         messages: [
           { role: 'system', content: systemMessage },
           { role: 'user', content: prompt },

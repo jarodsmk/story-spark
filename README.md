@@ -28,6 +28,18 @@ To build the standalone Tauri 2 desktop executable (requires Rust and Cargo inst
 npm run tauri dev
 ```
 
+### Running with Docker
+
+Build and run the containerized application locally on port 8080:
+
+```bash
+docker build -t story-spark:latest .
+docker run -d -p 8080:80 --name story-spark story-spark:latest
+```
+
+Access StorySpark at `http://localhost:8080`.
+
+
 ---
 
 ## 🏗️ Architecture
@@ -103,11 +115,11 @@ Never commit real API keys to version control. StorySpark provides a template in
    # Leave blank if using a local offline LLM (e.g. Ollama)
    VITE_LLM_API_KEY=
 
-   # Local Ollama or remote OpenAI/OpenRouter
-   VITE_LLM_BASE_URL=https://api.openai.com/v1
+   # OpenRouter (default), or local Ollama / LM Studio / OpenAI
+   VITE_LLM_BASE_URL=https://openrouter.ai/api/v1
 
-   # Desired model name
-   VITE_LLM_MODEL=gpt-4o-mini
+   # Desired model name (default: Microsoft WizardLM-2 8x22B)
+   VITE_LLM_MODEL=microsoft/wizardlm-2-8x22b
    ```
    *Note: Settings can also be updated directly within the application's UI via the Settings modal.*
 
