@@ -112,6 +112,121 @@ router.post('/rewrite', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * Generate creative fiction prose with connected LLM
+ */
+router.post('/generate', async (req: Request, res: Response) => {
+  try {
+    const {
+      prompt,
+      systemPrompt,
+      length = 'standard',
+      style = 'default',
+      customStyle,
+      selectedText,
+      surroundingContext,
+      temperature = 0.75,
+    } = req.body;
+
+    if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
+      return res.status(400).json({ error: 'Please describe the content to generate.' });
+    }
+
+    // Determine target word count / length description
+    let lengthGuidance = '';
+    if (typeof length === 'number') {
+      lengthGuidance = `Target length: approximately ${length} words.`;
+    } else {
+      switch (length) {
+        case 'brief':
+          lengthGuidance = 'Target length: brief (approximately 50-100 words / a quick scene beat or short paragraph).';
+          break;
+        case 'standard':
+          lengthGuidance = 'Target length: standard (approximately 150-250 words / a solid narrative paragraph or dialogue exchange).';
+          break;
+        case 'extended':
+          lengthGuidance = 'Target length: extended (approximately 350-500 words / a detailed sequence or chapter section).';
+          break;
+        default:
+          lengthGuidance = 'Target length: approximately 200 words.';
+          break;
+      }
+    }
+
+    // Determine writing style description
+    let styleGuidance = '';
+    switch (style) {
+      case 'vivid-sensory':
+        styleGuidance = 'Writing style: Vivid & Sensory. Ground the prose in visceral tactile textures, ambient acoustics, lighting, and evocative physical descriptions.';
+        break;
+      case 'fast-paced':
+        styleGuidance = 'Writing style: Fast-Paced & Tense. Use crisp, punchy sentences, active verbs, urgent cadence, and heightened tension.';
+        break;
+      case 'lyrical':
+        styleGuidance = 'Writing style: Atmospheric & Lyrical. Use rich cadence, evocative subtext, poetic depth, and emotional resonance.';
+        break;
+      case 'snappy-dialogue':
+        styleGuidance = 'Writing style: Sharp & Dialogue-Driven. Focus on natural character voice, witty subtext, dynamic banter, and minimal dialogue tags.';
+        break;
+      case 'dark-gritty':
+        styleGuidance = 'Writing style: Dark & Gritty. Uncompromising realism, atmospheric weight, raw tension, and grounded sensory detail.';
+        break;
+      case 'custom':
+        styleGuidance = customStyle ? `Writing style: ${customStyle}` : '';
+        break;
+      default:
+        styleGuidance = 'Writing style: Natural & Immersive. Match standard contemporary fiction publishing standards.';
+        break;
+    }
+
+    const defaultSystem =
+      systemPrompt ||
+      'You are a master fiction novelist and creative writing assistant. ' +
+      'Generate immersive, high-craft story prose matching the author\'s instructions and story context. ' +
+      'Maintain narrative consistency, show-don\'t-tell depth, and authentic character voice. ' +
+      'Do NOT include any preamble, introductory greeting, concluding commentary, or quotation wrappers. ' +
+      'Return ONLY the raw narrative prose to be inserted directly into the manuscript.';
+
+    let userMessage = `Content Description / Instructions:\n${prompt.trim()}\n\n${lengthGuidance}\n${styleGuidance}`;
+
+    if (selectedText && selectedText.trim()) {
+      userMessage += `\n\nReference / Selected Passage in Scene:\n"""\n${selectedText.trim()}\n"""`;
+    }
+
+    if (surroundingContext && surroundingContext.trim()) {
+      // Provide surrounding context up to ~1500 chars to keep prompt focused
+      const trimmedContext = surroundingContext.trim().slice(-2000);
+      userMessage += `\n\nSurrounding Scene Context:\n"""\n${trimmedContext}\n"""`;
+    }
+
+    let generated = await generateWithGemini({
+      contents: userMessage,
+      systemInstruction: defaultSystem,
+      temperature,
+    });
+
+    generated = generated.trim();
+    if (generated.startsWith('"""') && generated.endsWith('"""')) {
+      generated = generated.slice(3, -3).trim();
+    } else if (generated.startsWith('```markdown') && generated.endsWith('```')) {
+      generated = generated.slice(11, -3).trim();
+    } else if (generated.startsWith('```') && generated.endsWith('```')) {
+      generated = generated.slice(3, -3).trim();
+    }
+
+    const wordCount = generated.split(/\s+/).filter(w => w.length > 0).length;
+
+    res.json({
+      generatedText: generated,
+      prompt,
+      wordCount,
+    });
+  } catch (err: any) {
+    console.error('[Gemini /generate error]', err);
+    res.status(500).json({ error: err.message || 'AI content generation failed' });
+  }
+});
+
 interface RawAISuggestion {
   title: string;
   description: string;

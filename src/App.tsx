@@ -283,6 +283,7 @@ export function App() {
         onUnlinkLore={handleUnlinkLore}
         onCreateLoreEntry={handleCreateLoreEntry}
         onOpenFile={loadFile}
+        llmSettings={settings.llmSettings}
       />
 
       <SettingsModal

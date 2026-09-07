@@ -95,3 +95,14 @@ export interface RewriteRequest {
   instruction: string;
   fullContext?: string; // Optional context, but passage is isolated
 }
+
+export interface GenerateContentRequest {
+  prompt: string;
+  length?: 'brief' | 'standard' | 'extended' | number;
+  style?: string;
+  customStyle?: string;
+  systemPrompt?: string;
+  selectedText?: string;
+  surroundingContext?: string;
+  temperature?: number;
+}

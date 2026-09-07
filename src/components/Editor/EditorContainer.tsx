@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { SourcePane } from './SourcePane.tsx';
 import { SuggestionsPane } from './SuggestionsPane.tsx';
 import { PreviewPane } from './PreviewPane.tsx';
-import { Suggestion } from '../../types/index.ts';
+import { Suggestion, LLMSettings } from '../../types/index.ts';
 import { LoreEntry } from '../../engine/lore/loreReference.ts';
 
 interface EditorContainerProps {
@@ -41,6 +41,7 @@ interface EditorContainerProps {
     details: { roleOrAtmosphere: string; summary: string }
   ) => Promise<LoreEntry>;
   onOpenFile?: (path: string) => void;
+  llmSettings?: LLMSettings;
 }
 
 export const EditorContainer: React.FC<EditorContainerProps> = ({
@@ -75,6 +76,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
   onUnlinkLore,
   onCreateLoreEntry,
   onOpenFile,
+  llmSettings,
 }) => {
   const [selectedSuggestionId, setSelectedSuggestionId] = useState<string | null>(null);
   const [isDiffCollapsed, setIsDiffCollapsed] = useState<boolean>(() => {
@@ -178,6 +180,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
           onUnlinkLore={onUnlinkLore}
           onCreateLoreEntry={onCreateLoreEntry}
           onOpenFile={onOpenFile}
+          llmSettings={llmSettings}
         />
       </div>
 

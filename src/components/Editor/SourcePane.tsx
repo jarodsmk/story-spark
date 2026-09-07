@@ -12,7 +12,7 @@ import {
   Compass,
   Tag,
 } from 'lucide-react';
-import { Suggestion } from '../../types/index.ts';
+import { Suggestion, LLMSettings } from '../../types/index.ts';
 import {
   LoreEntry,
   findLoreReferences,
@@ -24,6 +24,7 @@ import { LoreContextMenu } from './LoreContextMenu.tsx';
 import { LoreHoverTooltip } from './LoreHoverTooltip.tsx';
 import { NewLoreModal } from './NewLoreModal.tsx';
 import { LoreTextRenderer } from './LoreTextRenderer.tsx';
+import { GenerateContentModal } from './GenerateContentModal.tsx';
 
 interface SourcePaneProps {
   content: string;
@@ -49,6 +50,7 @@ interface SourcePaneProps {
     details: { roleOrAtmosphere: string; summary: string }
   ) => Promise<LoreEntry>;
   onOpenFile?: (path: string) => void;
+  llmSettings?: LLMSettings;
 }
 
 export const SourcePane: React.FC<SourcePaneProps> = ({
@@ -71,6 +73,7 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
   onUnlinkLore,
   onCreateLoreEntry,
   onOpenFile,
+  llmSettings,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -118,6 +121,58 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
     startIndex: 0,
     endIndex: 0,
   });
+
+  // Generate Content Modal state
+  const [generateModal, setGenerateModal] = useState<{
+    isOpen: boolean;
+    selectedText: string;
+    startIndex: number;
+    endIndex: number;
+  }>({
+    isOpen: false,
+    selectedText: '',
+    startIndex: 0,
+    endIndex: 0,
+  });
+
+  const handleOpenGenerateContent = (
+    selectedText: string,
+    startIndex: number,
+    endIndex: number
+  ) => {
+    setGenerateModal({
+      isOpen: true,
+      selectedText,
+      startIndex,
+      endIndex,
+    });
+  };
+
+  const handleInsertGeneratedContent = (
+    generatedText: string,
+    mode: 'replace-or-cursor' | 'append'
+  ) => {
+    if (mode === 'append') {
+      const trimmed = content.trimEnd();
+      const newContent = trimmed ? `${trimmed}\n\n${generatedText}` : generatedText;
+      onChange(newContent);
+    } else {
+      const start = generateModal.startIndex;
+      const end = generateModal.endIndex;
+      const before = content.slice(0, start);
+      const after = content.slice(end);
+      const newContent = before + generatedText + after;
+      onChange(newContent);
+
+      setTimeout(() => {
+        if (textareaRef.current) {
+          const newPos = start + generatedText.length;
+          textareaRef.current.focus();
+          textareaRef.current.setSelectionRange(newPos, newPos);
+        }
+      }, 50);
+    }
+  };
 
   // Keep backdrop scroll in sync with textarea
   const handleScroll = () => {
@@ -616,7 +671,7 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
         />
       )}
 
-      {/* Context Menu for Lore Referencing */}
+      {/* Context Menu for Lore Referencing & AI Content Generation */}
       <LoreContextMenu
         isOpen={contextMenu.isOpen}
         x={contextMenu.x}
@@ -629,6 +684,7 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
         loreItems={loreWorld}
         onSelectReference={handleSelectReference}
         onOpenNewModal={handleOpenNewModal}
+        onOpenGenerateContent={handleOpenGenerateContent}
         onUnlinkReference={handleUnlink}
         onOpenBibleFile={(path) => {
           if (onOpenFile) onOpenFile(path);
@@ -643,6 +699,19 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
         defaultName={newLoreModal.defaultName}
         onSubmit={handleCreateEntrySubmit}
         onClose={() => setNewLoreModal((prev) => ({ ...prev, isOpen: false }))}
+      />
+
+      {/* AI Generate Content Modal */}
+      <GenerateContentModal
+        isOpen={generateModal.isOpen}
+        onClose={() => setGenerateModal((prev) => ({ ...prev, isOpen: false }))}
+        selectedText={generateModal.selectedText}
+        startIndex={generateModal.startIndex}
+        endIndex={generateModal.endIndex}
+        surroundingContext={content}
+        activeFileName={title}
+        llmSettings={llmSettings}
+        onInsertContent={handleInsertGeneratedContent}
       />
     </div>
   );

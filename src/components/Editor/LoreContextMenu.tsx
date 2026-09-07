@@ -10,6 +10,7 @@ import {
   ExternalLink,
   Tag,
   X,
+  Sparkles,
 } from 'lucide-react';
 import { LoreEntry, LoreReferenceMatch } from '../../engine/lore/loreReference.ts';
 
@@ -25,6 +26,7 @@ interface LoreContextMenuProps {
   loreItems: LoreEntry[];
   onSelectReference: (targetPath: string) => void;
   onOpenNewModal: (category: 'character' | 'world') => void;
+  onOpenGenerateContent?: (selectedText: string, startIndex: number, endIndex: number) => void;
   onUnlinkReference?: () => void;
   onOpenBibleFile?: (path: string) => void;
   onClose: () => void;
@@ -35,11 +37,14 @@ export const LoreContextMenu: React.FC<LoreContextMenuProps> = ({
   x,
   y,
   selectedText,
+  startIndex,
+  endIndex,
   existingReference,
   characters,
   loreItems,
   onSelectReference,
   onOpenNewModal,
+  onOpenGenerateContent,
   onUnlinkReference,
   onOpenBibleFile,
   onClose,
@@ -126,6 +131,37 @@ export const LoreContextMenu: React.FC<LoreContextMenuProps> = ({
           className="text-stone-500 hover:text-stone-300 p-0.5 rounded transition"
         >
           <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* AI Generate Content Action */}
+      <div className="p-1.5 border-b border-stone-800 bg-amber-950/20">
+        <button
+          type="button"
+          onClick={() => {
+            if (onOpenGenerateContent) {
+              onOpenGenerateContent(selectedText, startIndex, endIndex);
+            }
+            onClose();
+          }}
+          className="w-full text-left px-2.5 py-2 rounded-lg bg-gradient-to-r from-amber-500/15 via-amber-600/10 to-amber-700/15 hover:from-amber-500/25 hover:to-amber-700/25 text-amber-200 hover:text-amber-100 flex items-center justify-between transition border border-amber-500/30 group shadow-sm"
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded-md bg-amber-500/20 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform duration-150">
+              <Sparkles className="w-3.5 h-3.5" />
+            </div>
+            <div>
+              <div className="font-semibold text-xs text-amber-200 group-hover:text-amber-100 flex items-center gap-1.5">
+                <span>Generate Content...</span>
+              </div>
+              <div className="text-[10px] text-amber-400/80">
+                Draft with connected LLM
+              </div>
+            </div>
+          </div>
+          <span className="text-[10px] font-mono font-medium uppercase bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30">
+            AI
+          </span>
         </button>
       </div>
 
