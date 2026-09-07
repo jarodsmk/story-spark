@@ -49,6 +49,8 @@ interface EditorContainerProps {
   onOpenSceneSummary?: () => void;
   isSidebarCollapsed?: boolean;
   onToggleSidebarCollapse?: () => void;
+  isCharacterOrWorld?: boolean;
+  documentCategory?: 'scene' | 'character' | 'world';
 }
 
 export const EditorContainer: React.FC<EditorContainerProps> = ({
@@ -91,6 +93,8 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
   onOpenSceneSummary,
   isSidebarCollapsed,
   onToggleSidebarCollapse,
+  isCharacterOrWorld = false,
+  documentCategory = 'scene',
 }) => {
   const [selectedSuggestionId, setSelectedSuggestionId] = useState<string | null>(null);
   const [isDiffCollapsed, setIsDiffCollapsed] = useState<boolean>(() => {
@@ -198,6 +202,8 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
           activeFileName={activeFileName}
           isCollapsed={isSuggestionsCollapsed}
           onToggleCollapse={handleToggleSuggestionsCollapse}
+          isCharacterOrWorld={isCharacterOrWorld}
+          documentCategory={documentCategory}
         />
       </div>
 
@@ -234,6 +240,8 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
           priorSceneSummaries={priorSceneSummaries}
           allSceneSummaries={allSceneSummaries}
           onOpenSceneSummary={onOpenSceneSummary}
+          isCharacterOrWorld={isCharacterOrWorld}
+          documentCategory={documentCategory}
         />
       </div>
 
@@ -256,6 +264,8 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
           onToggleCollapse={handleToggleDiffCollapse}
           loreEntries={loreEntries}
           onOpenFile={onOpenFile}
+          isCharacterOrWorld={isCharacterOrWorld}
+          documentCategory={documentCategory}
         />
       </div>
     </div>

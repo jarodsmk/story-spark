@@ -62,7 +62,6 @@ export function checkWeakWords(
         replacementText: matchedText,
         startIndex,
         endIndex,
-        ruleCategory: 'style',
         severity: 'suggestion',
       });
     }
@@ -161,7 +160,6 @@ export function checkRedundantAdverbs(
         replacementText,
         startIndex,
         endIndex,
-        ruleCategory: 'style',
         severity: 'suggestion',
       });
     }
@@ -228,7 +226,6 @@ export function checkCliches(
         replacementText: matchedText,
         startIndex,
         endIndex,
-        ruleCategory: 'style',
         severity: 'info',
       });
     }

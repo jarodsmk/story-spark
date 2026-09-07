@@ -11,6 +11,7 @@ import { useProjectSettings } from './hooks/useProjectSettings.ts';
 import { useManuscriptActions } from './hooks/useManuscriptActions.ts';
 import { useLoreManager } from './hooks/useLoreManager.ts';
 import { useSceneSummaries } from './hooks/useSceneSummaries.ts';
+import { getDocumentCategory, isCharacterOrWorldDocument } from './utils/documentType.ts';
 
 import { Sidebar } from './components/Navigation/Sidebar.tsx';
 import { EditorContainer } from './components/Editor/EditorContainer.tsx';
@@ -158,19 +159,32 @@ export function App() {
 
   const currentSummary = sceneSummaries.getSummary(files.activeFilePath);
 
+  const isCharacterOrWorld = useMemo(() => {
+    return isCharacterOrWorldDocument(files.activeFilePath);
+  }, [files.activeFilePath]);
+
+  const documentCategory = useMemo(() => {
+    return getDocumentCategory(files.activeFilePath);
+  }, [files.activeFilePath]);
+
   const ignoredSet = useMemo(() => new Set(settings.ignoredTerms.map(t => t.term.toLowerCase())), [settings.ignoredTerms]);
 
   const deterministicSuggestions = useMemo(() => {
-    if (!hist.state) return [];
+    // Never run suggestions or checks on characters & world/lore screens
+    if (!hist.state || isCharacterOrWorld) return [];
     return runAllChecks(hist.state, settings.rules, ignoredSet).filter(s => !dismissed.has(s.id));
-  }, [hist.state, settings.rules, ignoredSet, dismissed]);
+  }, [hist.state, settings.rules, ignoredSet, dismissed, isCharacterOrWorld]);
 
   const suggestions = useMemo(() => {
+    // Never provide suggestions on characters & world/lore screens
+    if (isCharacterOrWorld) return [];
     const activeAI = aiSuggestions.filter(s => !dismissed.has(s.id));
     return [...deterministicSuggestions, ...activeAI];
-  }, [deterministicSuggestions, aiSuggestions, dismissed]);
+  }, [isCharacterOrWorld, deterministicSuggestions, aiSuggestions, dismissed]);
 
   const handleAIRewrite = async (inst: string) => {
+    // Never run AI features on characters & world/lore screens
+    if (isCharacterOrWorld) return;
     if (!selText.trim()) return;
     setGenAI(true);
     setAiErr(null);
@@ -189,6 +203,8 @@ export function App() {
     instruction?: string,
     scope: 'scene' | 'selection' = 'scene'
   ) => {
+    // Never run AI features or editorial passes on characters & world/lore screens
+    if (isCharacterOrWorld) return;
     const textToAnalyze = scope === 'selection' && selText.trim() ? selText : hist.state;
     if (!textToAnalyze.trim()) return;
 
@@ -315,13 +331,13 @@ export function App() {
         onAcceptSuggestion={(s) => {
           handleChange(applySuggestion(hist.state, s.startIndex, s.endIndex, s.replacementText));
           setDismissed(prev => new Set(prev).add(s.id));
-          if (s.ruleCategory === 'ai') {
+          if (s.ruleCategory === 'ai' || s.type === 'ai-rewrite') {
             setAiSuggestions(prev => prev.filter(item => item.id !== s.id));
           }
         }}
         onDismissSuggestion={(s) => {
           setDismissed(prev => new Set(prev).add(s.id));
-          if (s.ruleCategory === 'ai') {
+          if (s.ruleCategory === 'ai' || s.type === 'ai-rewrite') {
             setAiSuggestions(prev => prev.filter(item => item.id !== s.id));
           }
         }}
@@ -353,10 +369,16 @@ export function App() {
         currentSceneSummaryWordCount={currentSummary?.wordCount}
         priorSceneSummaries={priorSummaries}
         allSceneSummaries={allSummaries}
-        onOpenSceneSummary={() => {
-          setSummaryModalTargetFile(files.activeFilePath);
-          setOpenSummariesModal(true);
-        }}
+        onOpenSceneSummary={
+          isCharacterOrWorld
+            ? undefined
+            : () => {
+                setSummaryModalTargetFile(files.activeFilePath);
+                setOpenSummariesModal(true);
+              }
+        }
+        isCharacterOrWorld={isCharacterOrWorld}
+        documentCategory={documentCategory}
         isSidebarCollapsed={isSidebarCollapsed}
         onToggleSidebarCollapse={handleToggleSidebarCollapse}
       />

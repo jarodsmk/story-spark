@@ -20,54 +20,110 @@ export * from './filterWords.ts';
 export * from './styleCraft.ts';
 
 /**
+ * Check runner definition mapping rule IDs to their Compromise check executions.
+ */
+interface CheckDefinition {
+  id: string;
+  legacyCategory?: string;
+  run: (doc: ReturnType<typeof getNlpDoc>, text: string, rule: UserRule, ignoredTerms: Set<string>) => Suggestion[];
+}
+
+const CHECK_DEFINITIONS: CheckDefinition[] = [
+  {
+    id: 'rule-rep-words',
+    legacyCategory: 'repeated-word',
+    run: (doc, text, _rule, ignoredTerms) => checkRepeatedWords(doc, ignoredTerms, text),
+  },
+  {
+    id: 'rule-sent-len',
+    legacyCategory: 'sentence-length',
+    run: (doc, text, rule) => checkSentenceLength(doc, rule.threshold || 30, text),
+  },
+  {
+    id: 'rule-passive',
+    legacyCategory: 'passive-voice',
+    run: (doc, text) => checkPassiveVoice(doc, text),
+  },
+  {
+    id: 'rule-typography',
+    legacyCategory: 'typography',
+    run: (doc, text) => checkTypography(doc, text),
+  },
+  {
+    id: 'rule-grammar-confusions',
+    legacyCategory: 'grammar-confusions',
+    run: (doc, text, _rule, ignoredTerms) => checkGrammarConfusions(doc, ignoredTerms, text),
+  },
+  {
+    id: 'rule-article-agreement',
+    legacyCategory: 'article-agreement',
+    run: (doc, text) => checkArticleAgreement(doc, text),
+  },
+  {
+    id: 'rule-filter-words',
+    legacyCategory: 'filter-words',
+    run: (doc, text) => checkFilterWords(doc, text),
+  },
+  {
+    id: 'rule-weak-words',
+    legacyCategory: 'weak-words',
+    run: (doc, text) => checkWeakWords(doc, text),
+  },
+  {
+    id: 'rule-redundant-adverbs',
+    legacyCategory: 'redundant-adverbs',
+    run: (doc, text) => checkRedundantAdverbs(doc, text),
+  },
+  {
+    id: 'rule-cliches',
+    legacyCategory: 'cliches',
+    run: (doc, text) => checkCliches(doc, text),
+  },
+];
+
+/**
  * Runs all enabled deterministic suggestions and editorial passes
  * powered by the spencermountain/compromise NLP engine.
- * Initializes a single Compromise document per run for optimal performance.
+ * Initializes a single Compromise document per run for fluid, high-performance validation.
  */
 export function runAllChecks(
   text: string,
-  rules: UserRule[],
-  ignoredTerms: Set<string>
+  rules: UserRule[] = DEFAULT_USER_RULES,
+  ignoredTerms: Set<string> = new Set()
 ): Suggestion[] {
-  let suggestions: Suggestion[] = [];
+  if (!text || text.trim().length === 0) {
+    return [];
+  }
 
-  // Parse text once with Compromise NLP
+  // Parse text once into a single Compromise NLP document for fluid validation across all checks
   const doc = getNlpDoc(text);
+  const suggestions: Suggestion[] = [];
 
-  for (const rule of rules) {
-    if (!rule.enabled) continue;
+  // Build lookup maps for fast rule matching
+  const rulesById = new Map<string, UserRule>();
+  const rulesByLegacyCategory = new Map<string, UserRule>();
 
-    switch (rule.category) {
-      case 'repeated-word':
-        suggestions.push(...checkRepeatedWords(doc, ignoredTerms, text));
-        break;
-      case 'sentence-length':
-        suggestions.push(...checkSentenceLength(doc, rule.threshold || 30, text));
-        break;
-      case 'passive-voice':
-        suggestions.push(...checkPassiveVoice(doc, text));
-        break;
-      case 'typography':
-        suggestions.push(...checkTypography(doc, text));
-        break;
-      case 'grammar-confusions':
-        suggestions.push(...checkGrammarConfusions(doc, ignoredTerms, text));
-        break;
-      case 'article-agreement':
-        suggestions.push(...checkArticleAgreement(doc, text));
-        break;
-      case 'filter-words':
-        suggestions.push(...checkFilterWords(doc, text));
-        break;
-      case 'weak-words':
-        suggestions.push(...checkWeakWords(doc, text));
-        break;
-      case 'redundant-adverbs':
-        suggestions.push(...checkRedundantAdverbs(doc, text));
-        break;
-      case 'cliches':
-        suggestions.push(...checkCliches(doc, text));
-        break;
+  for (const r of rules) {
+    if (r.id) rulesById.set(r.id, r);
+    if (r.category) rulesByLegacyCategory.set(r.category, r);
+  }
+
+  for (const def of CHECK_DEFINITIONS) {
+    // Find active rule configuration
+    const activeRule = rulesById.get(def.id) || (def.legacyCategory ? rulesByLegacyCategory.get(def.legacyCategory) : undefined);
+
+    // If rules are provided and this rule is explicitly disabled, skip it
+    if (activeRule && !activeRule.enabled) {
+      continue;
+    }
+
+    try {
+      const results = def.run(doc, text, activeRule || { id: def.id, name: def.id, enabled: true, description: '' }, ignoredTerms);
+      if (results && results.length > 0) {
+        suggestions.push(...results);
+      }
+    } catch (err) {
+      console.error(`Validation check failed for [${def.id}]:`, err);
     }
   }
 
@@ -84,14 +140,12 @@ export const DEFAULT_USER_RULES: UserRule[] = [
   {
     id: 'rule-rep-words',
     name: 'Repeated Words',
-    category: 'repeated-word',
     enabled: true,
     description: 'Flags accidental consecutive duplicate words.',
   },
   {
     id: 'rule-sent-len',
     name: 'Sentence Length',
-    category: 'sentence-length',
     enabled: true,
     threshold: 30,
     description: 'Warns when fiction sentences exceed target word count.',
@@ -99,56 +153,48 @@ export const DEFAULT_USER_RULES: UserRule[] = [
   {
     id: 'rule-passive',
     name: 'Passive Voice',
-    category: 'passive-voice',
     enabled: true,
     description: 'Highlights passive verbs that may reduce dramatic tension.',
   },
   {
     id: 'rule-grammar-confusions',
     name: 'Grammar & Homophone Confusions',
-    category: 'grammar-confusions',
     enabled: true,
     description: 'Flags confused pairs (could of/have, then/than, loose/lose, its/it\'s, their/there).',
   },
   {
     id: 'rule-article-agreement',
     name: 'Indefinite Article Agreement',
-    category: 'article-agreement',
     enabled: true,
     description: 'Ensures correct usage of "a" vs "an" before vowel/consonant sounds.',
   },
   {
     id: 'rule-filter-words',
     name: 'Sensory Filter Words',
-    category: 'filter-words',
     enabled: true,
     description: 'Detects perception filter verbs (saw, heard, noticed, felt) that distance readers from deep POV.',
   },
   {
     id: 'rule-weak-words',
     name: 'Pacing & Weak Intensifiers',
-    category: 'weak-words',
     enabled: true,
     description: 'Highlights "suddenly", "began to", and crutch adverbs like "very" or "really".',
   },
   {
     id: 'rule-redundant-adverbs',
     name: 'Redundant Modifiers & Tautologies',
-    category: 'redundant-adverbs',
     enabled: true,
     description: 'Cuts redundant dialogue and action modifiers (whispered softly, nodded his head).',
   },
   {
     id: 'rule-cliches',
     name: 'Fiction Clichés',
-    category: 'cliches',
     enabled: true,
     description: 'Catches worn narrative expressions (cold as ice, dark and stormy, heart in throat).',
   },
   {
     id: 'rule-typography',
     name: 'Typography Standards',
-    category: 'typography',
     enabled: true,
     description: 'Standardizes curly quotes, em-dashes, contraction apostrophes, spacing, and dialogue punctuation.',
   },

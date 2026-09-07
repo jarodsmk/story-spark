@@ -19,6 +19,8 @@ interface PreviewPaneProps {
   onToggleCollapse?: () => void;
   loreEntries?: LoreEntry[];
   onOpenFile?: (path: string) => void;
+  isCharacterOrWorld?: boolean;
+  documentCategory?: 'scene' | 'character' | 'world';
 }
 
 export const PreviewPane: React.FC<PreviewPaneProps> = ({
@@ -34,6 +36,8 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
   onToggleCollapse,
   loreEntries = [],
   onOpenFile,
+  isCharacterOrWorld = false,
+  documentCategory = 'scene',
 }) => {
   const [viewMode, setViewMode] = useState<'preview' | 'diff'>('preview');
 

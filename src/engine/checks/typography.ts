@@ -35,7 +35,6 @@ export function checkTypography(
       replacementText: ' ',
       startIndex: match.index,
       endIndex: match.index + match[0].length,
-      ruleCategory: 'typography',
       severity: 'suggestion',
     });
   }
@@ -52,7 +51,6 @@ export function checkTypography(
       replacementText: '…',
       startIndex: match.index,
       endIndex: match.index + match[0].length,
-      ruleCategory: 'typography',
       severity: 'suggestion',
     });
   }
@@ -76,7 +74,6 @@ export function checkTypography(
       replacementText: '—',
       startIndex: match.index,
       endIndex: match.index + match[0].length,
-      ruleCategory: 'typography',
       severity: 'suggestion',
     });
   }
@@ -93,7 +90,6 @@ export function checkTypography(
       replacementText: match[0][0],
       startIndex: match.index,
       endIndex: match.index + match[0].length,
-      ruleCategory: 'typography',
       severity: 'suggestion',
     });
   }
@@ -112,7 +108,6 @@ export function checkTypography(
       replacementText: `“${inner}”`,
       startIndex: match.index,
       endIndex: match.index + full.length,
-      ruleCategory: 'typography',
       severity: 'suggestion',
     });
   }
@@ -131,7 +126,6 @@ export function checkTypography(
       replacementText: replacement,
       startIndex: match.index,
       endIndex: match.index + full.length,
-      ruleCategory: 'typography',
       severity: 'suggestion',
     });
   }
@@ -151,7 +145,6 @@ export function checkTypography(
       replacementText: `${word}${punct}`,
       startIndex: match.index,
       endIndex: match.index + full.length,
-      ruleCategory: 'typography',
       severity: 'suggestion',
     });
   }
@@ -172,7 +165,6 @@ export function checkTypography(
       replacementText: `${firstWord}${punct} ${secondWord}`,
       startIndex: match.index,
       endIndex: match.index + full.length,
-      ruleCategory: 'typography',
       severity: 'suggestion',
     });
   }
@@ -192,7 +184,6 @@ export function checkTypography(
       replacementText: `"${dialogue}${punct}"`,
       startIndex: match.index,
       endIndex: match.index + full.length,
-      ruleCategory: 'typography',
       severity: 'suggestion',
     });
   }
@@ -212,7 +203,6 @@ export function checkTypography(
       replacementText: `${startNum}–${endNum}`,
       startIndex: match.index,
       endIndex: match.index + full.length,
-      ruleCategory: 'typography',
       severity: 'suggestion',
     });
   }

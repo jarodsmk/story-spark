@@ -82,7 +82,6 @@ export function checkFilterWords(
         replacementText: matchedText,
         startIndex,
         endIndex,
-        ruleCategory: 'style',
         severity: 'info',
       });
     }

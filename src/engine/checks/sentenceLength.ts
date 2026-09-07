@@ -56,7 +56,6 @@ export function checkSentenceLength(
         replacementText: originalText,
         startIndex,
         endIndex,
-        ruleCategory: 'style',
         severity: 'warning',
       });
     }

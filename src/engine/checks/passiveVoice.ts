@@ -48,7 +48,6 @@ export function checkPassiveVoice(
       replacementText: matchedText,
       startIndex,
       endIndex,
-      ruleCategory: 'style',
       severity: 'info',
     });
   }

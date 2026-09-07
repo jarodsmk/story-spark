@@ -18,6 +18,8 @@ import {
   Crosshair,
   PanelLeftClose,
   PanelLeftOpen,
+  Users,
+  Globe,
 } from 'lucide-react';
 import { SuggestionCard } from './SuggestionCard.tsx';
 
@@ -39,6 +41,8 @@ interface SuggestionsPaneProps {
   activeFileName?: string;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  isCharacterOrWorld?: boolean;
+  documentCategory?: 'scene' | 'character' | 'world';
 }
 
 export const SuggestionsPane: React.FC<SuggestionsPaneProps> = ({
@@ -59,6 +63,8 @@ export const SuggestionsPane: React.FC<SuggestionsPaneProps> = ({
   activeFileName = 'Active Scene',
   isCollapsed = false,
   onToggleCollapse,
+  isCharacterOrWorld = false,
+  documentCategory = 'scene',
 }) => {
   const [activeFilter, setActiveFilter] = useState<string>('all');
   const [customInstruction, setCustomInstruction] = useState('');
@@ -69,33 +75,42 @@ export const SuggestionsPane: React.FC<SuggestionsPaneProps> = ({
   const [aiPassScope, setAiPassScope] = useState<'scene' | 'selection'>('scene');
   const [aiPassCustomPrompt, setAiPassCustomPrompt] = useState('');
 
-  const filtered = suggestions.filter(s => {
-    if (activeFilter === 'all') return true;
-    return s.ruleCategory === activeFilter;
-  });
-
-  const aiSuggestions = suggestions.filter(s => s.ruleCategory === 'ai');
-  const grammarCount = suggestions.filter(s => s.ruleCategory === 'grammar').length;
-  const styleCount = suggestions.filter(s => s.ruleCategory === 'style').length;
-  const typoCount = suggestions.filter(s => s.ruleCategory === 'typography').length;
+  const aiSuggestions = suggestions.filter(s => s.type === 'ai-rewrite' || s.ruleCategory === 'ai');
+  const checksCount = suggestions.filter(s => s.type !== 'ai-rewrite' && s.ruleCategory !== 'ai').length;
+  const grammarCount = suggestions.filter(s => s.ruleCategory === 'grammar' || s.type === 'grammar' || s.type === 'repeated-word').length;
+  const styleCount = suggestions.filter(s => s.ruleCategory === 'style' || s.type === 'passive-voice' || s.type === 'filter-word' || s.type === 'weak-word' || s.type === 'sentence-length' || s.type === 'cliche' || s.type === 'redundant-adverb').length;
+  const typoCount = suggestions.filter(s => s.ruleCategory === 'typography' || s.type === 'typography').length;
   const aiCount = aiSuggestions.length;
 
-  const hasSelection = !!selectedText.trim();
+  const filtered = suggestions.filter(s => {
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'checks') return s.type !== 'ai-rewrite' && s.ruleCategory !== 'ai';
+    if (activeFilter === 'ai') return s.type === 'ai-rewrite' || s.ruleCategory === 'ai';
+    if (activeFilter === 'grammar') return s.ruleCategory === 'grammar' || s.type === 'grammar' || s.type === 'repeated-word';
+    if (activeFilter === 'style') return s.ruleCategory === 'style' || s.type === 'passive-voice' || s.type === 'filter-word' || s.type === 'weak-word' || s.type === 'sentence-length' || s.type === 'cliche' || s.type === 'redundant-adverb';
+    if (activeFilter === 'typography') return s.ruleCategory === 'typography' || s.type === 'typography';
+    return s.ruleCategory === activeFilter || s.type === activeFilter;
+  });
+
+  const hasSelection = !isCharacterOrWorld && !!selectedText.trim();
   const selectionWordCount = hasSelection ? selectedText.trim().split(/\s+/).length : 0;
 
   const hasAutoRunRef = useRef<Record<string, boolean>>({});
 
   useEffect(() => {
+    // Never auto-run AI passes or suggestions on characters & world/lore screens
+    if (isCharacterOrWorld) return;
     if (activeFilter === 'ai' && aiCount === 0 && !isAnalyzingAI && onRunAIPass) {
       if (!hasAutoRunRef.current[activeFileName]) {
         hasAutoRunRef.current[activeFileName] = true;
         onRunAIPass('all');
       }
     }
-  }, [activeFilter, aiCount, isAnalyzingAI, onRunAIPass, activeFileName]);
+  }, [activeFilter, aiCount, isAnalyzingAI, onRunAIPass, activeFileName, isCharacterOrWorld]);
 
   const handleExecuteAIPass = async (overrideType?: string) => {
-    if (!onRunAIPass) return;
+    // Never execute AI passes on characters & world/lore screens
+    if (isCharacterOrWorld || !onRunAIPass) return;
     const typeToUse = overrideType || selectedPassType;
     const effectiveScope = hasSelection && aiPassScope === 'selection' ? 'selection' : 'scene';
     await onRunAIPass(typeToUse, aiPassCustomPrompt, effectiveScope);
@@ -179,37 +194,41 @@ export const SuggestionsPane: React.FC<SuggestionsPaneProps> = ({
             <PanelLeftOpen className="w-4 h-4" />
           </button>
 
-          {/* Suggestions count badge / trigger */}
-          {suggestions.length > 0 ? (
-            <button
-              type="button"
-              onClick={onToggleCollapse}
-              title={`${suggestions.length} suggestions pending - Click to expand`}
-              className="p-1 rounded bg-amber-950/80 border border-amber-800/60 hover:border-amber-500 text-amber-300 transition flex flex-col items-center gap-0.5 cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span className="text-[10px] font-mono font-bold leading-none">{suggestions.length}</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onToggleCollapse}
-              title="Expand Suggestions & Passes"
-              className="p-1.5 rounded hover:bg-stone-800 text-stone-500 hover:text-amber-400 transition cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-            </button>
-          )}
+          {!isCharacterOrWorld && (
+            <>
+              {/* Suggestions count badge / trigger */}
+              {suggestions.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={onToggleCollapse}
+                  title={`${suggestions.length} suggestions pending - Click to expand`}
+                  className="p-1 rounded bg-amber-950/80 border border-amber-800/60 hover:border-amber-500 text-amber-300 transition flex flex-col items-center gap-0.5 cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-[10px] font-mono font-bold leading-none">{suggestions.length}</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onToggleCollapse}
+                  title="Expand Suggestions & Passes"
+                  className="p-1.5 rounded hover:bg-stone-800 text-stone-500 hover:text-amber-400 transition cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                </button>
+              )}
 
-          {aiCount > 0 && (
-            <button
-              type="button"
-              onClick={onToggleCollapse}
-              title={`${aiCount} AI editorial passes ready - Click to view`}
-              className="px-1 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-800/50 text-[9px] font-mono hover:bg-amber-900/60 transition cursor-pointer"
-            >
-              {aiCount} AI
-            </button>
+              {aiCount > 0 && (
+                <button
+                  type="button"
+                  onClick={onToggleCollapse}
+                  title={`${aiCount} AI editorial passes ready - Click to view`}
+                  className="px-1 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-800/50 text-[9px] font-mono hover:bg-amber-900/60 transition cursor-pointer"
+                >
+                  {aiCount} AI
+                </button>
+              )}
+            </>
           )}
 
           <div className="w-4 h-px bg-stone-800 my-1" />
@@ -225,13 +244,15 @@ export const SuggestionsPane: React.FC<SuggestionsPaneProps> = ({
               className="text-[11px] font-medium tracking-wider uppercase whitespace-nowrap text-stone-400 group-hover:text-amber-300 transition"
               style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
             >
-              SUGGESTIONS & PASSES {suggestions.length > 0 ? `(${suggestions.length})` : ''}
+              {isCharacterOrWorld
+                ? 'SUGGESTIONS & PASSES (DISABLED)'
+                : `SUGGESTIONS & PASSES ${suggestions.length > 0 ? `(${suggestions.length})` : ''}`}
             </span>
           </button>
         </div>
 
         <div className="flex flex-col items-center space-y-2">
-          {hasSelection && (
+          {!isCharacterOrWorld && hasSelection && (
             <button
               type="button"
               onClick={onToggleCollapse}
@@ -243,6 +264,64 @@ export const SuggestionsPane: React.FC<SuggestionsPaneProps> = ({
           )}
         </div>
       </aside>
+    );
+  }
+
+  if (isCharacterOrWorld) {
+    return (
+      <div className="flex flex-col h-full bg-stone-900 border-r border-stone-800">
+        {/* Pane Header */}
+        <div className="h-12 border-b border-stone-800 px-3 sm:px-4 flex items-center justify-between bg-stone-950/40">
+          <div className="flex items-center space-x-2 truncate">
+            <Sparkles className="w-4 h-4 text-stone-500 flex-shrink-0" />
+            <span className="font-medium text-sm text-stone-300 truncate">Suggestions & Passes</span>
+            <span className="text-[10px] bg-stone-800 text-stone-400 border border-stone-700 px-1.5 py-0.5 rounded font-mono">
+              Disabled on Story Bible
+            </span>
+          </div>
+
+          <div className="flex items-center space-x-1.5 flex-shrink-0">
+            {onToggleCollapse && (
+              <button
+                id="suggestions-pane-collapse-btn"
+                type="button"
+                onClick={onToggleCollapse}
+                title="Collapse Suggestions & Passes pane"
+                className="p-1 text-stone-400 hover:text-amber-400 hover:bg-stone-800 rounded transition-colors ml-1"
+              >
+                <PanelLeftClose className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Informative Story Bible Notice */}
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-6 space-y-4 select-none">
+          <div className="w-12 h-12 rounded-full bg-stone-950/80 border border-stone-800 flex items-center justify-center shadow-sm">
+            {documentCategory === 'character' ? (
+              <Users className="w-6 h-6 text-blue-400/80" />
+            ) : (
+              <Globe className="w-6 h-6 text-emerald-400/80" />
+            )}
+          </div>
+          <div className="space-y-1.5 max-w-xs">
+            <h3 className="text-sm font-semibold text-stone-200">
+              {documentCategory === 'character' ? 'Character Profile' : 'World & Lore Sheet'}
+            </h3>
+            <p className="text-xs text-stone-400 leading-relaxed">
+              Suggestions & Passes and AI editorial features are disabled on {documentCategory === 'character' ? 'character profiles' : 'world and lore entries'}.
+            </p>
+          </div>
+          <div className="p-3 bg-stone-950/60 border border-stone-800/80 rounded-lg text-left text-xs text-stone-400 space-y-1.5 max-w-xs">
+            <div className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider">
+              Manuscript Focus
+            </div>
+            <p className="text-[11px] text-stone-400 leading-snug">
+              Editorial checks, style rules, and AI drafting passes run exclusively on manuscript scenes to refine your novel's prose.
+            </p>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -385,9 +464,7 @@ export const SuggestionsPane: React.FC<SuggestionsPaneProps> = ({
         <Filter className="w-3 h-3 text-stone-500 mr-1 flex-shrink-0" />
         {[
           { key: 'all', label: 'all', count: suggestions.length },
-          { key: 'grammar', label: 'grammar', count: grammarCount },
-          { key: 'style', label: 'style', count: styleCount },
-          { key: 'typography', label: 'typography', count: typoCount },
+          { key: 'checks', label: 'checks', count: checksCount },
           { key: 'ai', label: 'AI Passes', count: aiCount },
         ].map((tab) => (
           <button

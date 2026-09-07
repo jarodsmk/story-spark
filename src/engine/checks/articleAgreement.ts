@@ -64,7 +64,6 @@ export function checkArticleAgreement(
         replacementText: `${correctArticle} ${nextWord}`,
         startIndex,
         endIndex,
-        ruleCategory: 'grammar',
         severity: 'warning',
       });
       continue;
@@ -82,7 +81,6 @@ export function checkArticleAgreement(
         replacementText: `${correctArticle} ${nextWord}`,
         startIndex,
         endIndex,
-        ruleCategory: 'grammar',
         severity: 'warning',
       });
     }

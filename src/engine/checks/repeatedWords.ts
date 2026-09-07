@@ -46,7 +46,6 @@ export function checkRepeatedWords(
           replacementText: t1.text,
           startIndex,
           endIndex,
-          ruleCategory: 'grammar',
           severity: 'warning',
         });
       }

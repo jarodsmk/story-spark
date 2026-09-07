@@ -62,6 +62,8 @@ interface SourcePaneProps {
   priorSceneSummaries?: Array<{ title: string; summary: string }>;
   allSceneSummaries?: Array<{ title: string; summary: string }>;
   onOpenSceneSummary?: () => void;
+  isCharacterOrWorld?: boolean;
+  documentCategory?: 'scene' | 'character' | 'world';
 }
 
 export const SourcePane: React.FC<SourcePaneProps> = ({
@@ -95,6 +97,8 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
   priorSceneSummaries = [],
   allSceneSummaries = [],
   onOpenSceneSummary,
+  isCharacterOrWorld = false,
+  documentCategory = 'scene',
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -464,7 +468,7 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
             </button>
           )}
 
-          {isSuggestionsCollapsed && onToggleSuggestionsCollapse && (
+          {isSuggestionsCollapsed && onToggleSuggestionsCollapse && !isCharacterOrWorld && (
             <button
               id="source-pane-show-suggestions-btn"
               type="button"
@@ -484,6 +488,17 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
 
           <FileText className="w-4 h-4 text-amber-500 flex-shrink-0" />
           <span className="font-medium text-sm text-stone-200 truncate">{title}</span>
+
+          {documentCategory === 'character' && (
+            <span className="text-[10px] bg-blue-950/70 text-blue-300 border border-blue-800/50 px-1.5 py-0.5 rounded font-mono flex items-center gap-1 flex-shrink-0">
+              <User className="w-2.5 h-2.5" /> Character
+            </span>
+          )}
+          {documentCategory === 'world' && (
+            <span className="text-[10px] bg-emerald-950/70 text-emerald-300 border border-emerald-800/50 px-1.5 py-0.5 rounded font-mono flex items-center gap-1 flex-shrink-0">
+              <Compass className="w-2.5 h-2.5" /> World
+            </span>
+          )}
 
           {/* Mode Switcher: Edit vs Live & Lore */}
           <div className="flex bg-stone-950 p-0.5 rounded border border-stone-800 ml-2">
@@ -530,7 +545,7 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
         </div>
 
         <div className="flex items-center space-x-2">
-          {onOpenSceneSummary && (
+          {!isCharacterOrWorld && onOpenSceneSummary && (
             <button
               id="source-pane-summarize-scene-btn"
               type="button"
@@ -722,7 +737,9 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
       {/* Footer Info */}
       <div className="h-8 border-t border-stone-800/60 px-4 flex items-center justify-between text-xs text-stone-500 bg-stone-950/20 flex-shrink-0">
         <span>
-          {sceneReferences.length > 0
+          {isCharacterOrWorld
+            ? `${documentCategory === 'character' ? 'Character Story Bible profile' : 'World & Lore Story Bible entry'} • Suggestions & AI editorial features disabled`
+            : sceneReferences.length > 0
             ? `${sceneReferences.length} lore reference${sceneReferences.length === 1 ? '' : 's'} linked • Right-click text to link`
             : 'Select text and right-click to reference characters & lore'}
         </span>
@@ -758,7 +775,7 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
         loreItems={loreWorld}
         onSelectReference={handleSelectReference}
         onOpenNewModal={handleOpenNewModal}
-        onOpenGenerateContent={handleOpenGenerateContent}
+        onOpenGenerateContent={isCharacterOrWorld ? undefined : handleOpenGenerateContent}
         onUnlinkReference={handleUnlink}
         onOpenBibleFile={(path) => {
           if (onOpenFile) onOpenFile(path);
@@ -777,7 +794,7 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
 
       {/* AI Generate Content Modal */}
       <GenerateContentModal
-        isOpen={generateModal.isOpen}
+        isOpen={!isCharacterOrWorld && generateModal.isOpen}
         onClose={() => setGenerateModal((prev) => ({ ...prev, isOpen: false }))}
         selectedText={generateModal.selectedText}
         startIndex={generateModal.startIndex}

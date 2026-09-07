@@ -169,7 +169,6 @@ export function checkGrammarConfusions(
         replacementText,
         startIndex,
         endIndex,
-        ruleCategory: 'grammar',
         severity: 'warning',
       });
     }

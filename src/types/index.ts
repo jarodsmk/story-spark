@@ -17,24 +17,14 @@ export interface Suggestion {
   replacementText: string;
   startIndex: number;
   endIndex: number;
-  ruleCategory: 'style' | 'grammar' | 'typography' | 'ai';
+  ruleCategory?: 'style' | 'grammar' | 'typography' | 'ai';
   severity: 'info' | 'warning' | 'suggestion';
 }
 
 export interface UserRule {
   id: string;
   name: string;
-  category:
-    | 'repeated-word'
-    | 'sentence-length'
-    | 'passive-voice'
-    | 'typography'
-    | 'grammar-confusions'
-    | 'article-agreement'
-    | 'filter-words'
-    | 'weak-words'
-    | 'redundant-adverbs'
-    | 'cliches';
+  category?: string;
   enabled: boolean;
   threshold?: number;
   description: string;
