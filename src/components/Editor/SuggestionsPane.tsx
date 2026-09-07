@@ -163,6 +163,9 @@ export const SuggestionsPane: React.FC<SuggestionsPaneProps> = ({
         <div className="flex items-center space-x-2">
           <Sparkles className="w-4 h-4 text-amber-500" />
           <span className="font-medium text-sm text-stone-200">Suggestions & Passes</span>
+          <span className="text-[10px] bg-sky-950/70 text-sky-400 border border-sky-800/50 px-1.5 py-0.5 rounded font-mono">
+            Compromise NLP
+          </span>
           <span className="text-xs bg-stone-800 text-stone-300 px-2 py-0.5 rounded-full font-mono">
             {suggestions.length}
           </span>
@@ -494,7 +497,7 @@ export const SuggestionsPane: React.FC<SuggestionsPaneProps> = ({
               <Check className="w-8 h-8 text-emerald-500/70 mb-2" />
               <p className="text-sm font-medium text-stone-300">Clean manuscript</p>
               <p className="text-xs text-stone-500 mt-1 max-w-xs">
-                No issues detected in active {activeFilter === 'all' ? 'rules' : activeFilter} pass.
+                No issues detected in active {activeFilter === 'all' ? 'rules' : activeFilter} pass (Compromise NLP engine).
               </p>
             </div>
           )

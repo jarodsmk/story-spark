@@ -8,6 +8,7 @@ import { checkArticleAgreement } from '../src/engine/checks/articleAgreement.ts'
 import { checkFilterWords } from '../src/engine/checks/filterWords.ts';
 import { checkWeakWords, checkRedundantAdverbs, checkCliches } from '../src/engine/checks/styleCraft.ts';
 import { runAllChecks, DEFAULT_USER_RULES } from '../src/engine/checks/index.ts';
+import { nlp } from '../src/engine/checks/compromise.ts';
 
 describe('Deterministic Writing Checks', () => {
   describe('checkRepeatedWords', () => {
@@ -174,6 +175,29 @@ describe('Deterministic Writing Checks', () => {
       const results = runAllChecks(sample, DEFAULT_USER_RULES, new Set());
       expect(results.length).toBeGreaterThanOrEqual(4);
       expect(results[0].startIndex).toBeLessThanOrEqual(results[1].startIndex);
+    });
+  });
+
+  describe('spencermountain/compromise Integration', () => {
+    it('accepts both string text and pre-parsed Compromise document', () => {
+      const sample = 'The letter was crumpled in his damp pocket.';
+      const doc = nlp(sample);
+      
+      const resFromString = checkPassiveVoice(sample);
+      const resFromDoc = checkPassiveVoice(doc, sample);
+
+      expect(resFromString.length).toBe(1);
+      expect(resFromDoc.length).toBe(1);
+      expect(resFromString[0].originalText).toBe(resFromDoc[0].originalText);
+      expect(resFromString[0].startIndex).toBe(resFromDoc[0].startIndex);
+    });
+
+    it('correctly maps NLP tag offsets to character coordinates', () => {
+      const sample = 'She whispered softly to the night.';
+      const res = checkRedundantAdverbs(sample);
+      expect(res.length).toBe(1);
+      expect(res[0].originalText).toBe('whispered softly');
+      expect(sample.slice(res[0].startIndex, res[0].endIndex)).toBe('whispered softly');
     });
   });
 });

@@ -1,49 +1,66 @@
 import { Suggestion } from '../../types/index.ts';
+import { getNlpDoc, CompromiseDoc } from './compromise.ts';
 
 /**
- * Flags sentences that exceed a configurable word count threshold (default 30 words).
+ * Flags sentences that exceed a configurable word count threshold (default 30 words)
+ * using spencermountain/compromise sentence segmentation and term parsing.
  * Preserves headings and markdown lists without treating them as run-on sentences.
  */
 export function checkSentenceLength(
-  text: string,
-  threshold: number = 30
+  input: string | CompromiseDoc,
+  threshold: number = 30,
+  rawText?: string
 ): Suggestion[] {
+  const doc = getNlpDoc(input);
+  const text = typeof input === 'string' ? input : (rawText ?? doc.text());
   const suggestions: Suggestion[] = [];
-  
-  // Split on sentence boundaries: '.', '!', '?', or newline
-  // We track character indices carefully
-  const sentenceRegex = /([^\.\?!;\n]+[\.\?!;]+|[^\.\?!;\n]+$)/g;
-  let match: RegExpExecArray | null;
 
-  while ((match = sentenceRegex.exec(text)) !== null) {
-    const rawSentence = match[0];
-    const trimmed = rawSentence.trim();
-    
+  const sentences = doc.sentences();
+  sentences.forEach((s) => {
+    const sJson = (s.json({ offset: true }) as any[])[0];
+    if (!sJson || !sJson.offset) return;
+
+    const raw = s.text();
+    const trimmed = raw.trim();
+
     // Ignore markdown headings, list markers, blank lines
-    if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('*') || trimmed.startsWith('-') || /^\d+\./.test(trimmed)) {
-      continue;
+    if (
+      !trimmed ||
+      trimmed.startsWith('#') ||
+      trimmed.startsWith('*') ||
+      trimmed.startsWith('-') ||
+      /^\d+\./.test(trimmed)
+    ) {
+      return;
     }
 
-    // Calculate word count
-    const words = trimmed.split(/\s+/).filter(w => w.length > 0);
-    if (words.length > threshold) {
-      const startIndex = match.index + rawSentence.indexOf(trimmed);
-      const endIndex = startIndex + trimmed.length;
+    const words = s.terms();
+    const wordCount = words.length;
+
+    if (wordCount > threshold) {
+      const leadWsMatch = raw.match(/^\s*/);
+      const leadWs = leadWsMatch ? leadWsMatch[0].length : 0;
+      const trailWsMatch = raw.match(/\s*$/);
+      const trailWs = trailWsMatch ? trailWsMatch[0].length : 0;
+
+      const startIndex = sJson.offset.start + leadWs;
+      const endIndex = sJson.offset.start + raw.length - trailWs;
+      const originalText = text.slice(startIndex, endIndex);
 
       suggestions.push({
         id: `len-${startIndex}-${endIndex}`,
         type: 'sentence-length',
-        title: `Long sentence (${words.length} words)`,
+        title: `Long sentence (${wordCount} words)`,
         description: `This sentence exceeds the target threshold of ${threshold} words. Long sentences can diminish pacing in fiction. Consider splitting into two or more sentences.`,
-        originalText: trimmed,
-        replacementText: trimmed, // User can rewrite or AI rewrite
+        originalText,
+        replacementText: originalText,
         startIndex,
         endIndex,
         ruleCategory: 'style',
         severity: 'warning',
       });
     }
-  }
+  });
 
   return suggestions;
 }

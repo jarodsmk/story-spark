@@ -1,7 +1,8 @@
 import { Suggestion } from '../../types/index.ts';
+import { getNlpDoc, CompromiseDoc } from './compromise.ts';
 
 /**
- * Deterministic typography checks:
+ * Deterministic typography checks powered by spencermountain/compromise:
  * 1. Multiple consecutive spaces
  * 2. Standardize ellipses: "..." -> "…"
  * 3. Standardize em-dashes: "--" or "---" -> "—"
@@ -13,7 +14,12 @@ import { Suggestion } from '../../types/index.ts';
  * 9. Dialogue punctuation placement: period/comma outside closing quote (e.g. "hello". -> "hello.")
  * 10. En-dash for number/year ranges: "1990-1995" -> "1990–1995"
  */
-export function checkTypography(text: string): Suggestion[] {
+export function checkTypography(
+  input: string | CompromiseDoc,
+  rawText?: string
+): Suggestion[] {
+  const doc = getNlpDoc(input);
+  const text = typeof input === 'string' ? input : (rawText ?? doc.text());
   const suggestions: Suggestion[] = [];
 
   // 1. Multiple spaces (2 or more spaces in the middle of a line)
@@ -54,7 +60,6 @@ export function checkTypography(text: string): Suggestion[] {
   // 3. Double/Triple hyphens (--) -> Em-dash (—)
   const emDashRegex = /---?|--/g;
   while ((match = emDashRegex.exec(text)) !== null) {
-    // Avoid markdown frontmatter or horizontal rules if on own line
     const lineStart = text.lastIndexOf('\n', match.index) + 1;
     const lineEnd = text.indexOf('\n', match.index);
     const line = text.slice(lineStart, lineEnd === -1 ? text.length : lineEnd).trim();
@@ -85,7 +90,7 @@ export function checkTypography(text: string): Suggestion[] {
       title: `Excessive punctuation: "${match[0]}"`,
       description: 'Multiple punctuation marks in narrative prose should usually be standardized to a single mark.',
       originalText: match[0],
-      replacementText: match[0][0], // First mark
+      replacementText: match[0][0],
       startIndex: match.index,
       endIndex: match.index + match[0].length,
       ruleCategory: 'typography',

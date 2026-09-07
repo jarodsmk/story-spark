@@ -1,68 +1,85 @@
 import { Suggestion } from '../../types/index.ts';
+import { getNlpDoc, CompromiseDoc, getMatchOffsets } from './compromise.ts';
 
 interface FilterPattern {
-  pattern: RegExp;
+  query: string;
   label: string;
   advice: string;
 }
 
-const FILTER_PATTERNS: FilterPattern[] = [
+const COMPROMISE_FILTER_PATTERNS: FilterPattern[] = [
   {
-    pattern: /\b(he|she|they|I|we)\s+(could\s+hear|could\s+see|could\s+feel|could\s+smell|could\s+sense)\b/gi,
+    query: '#Pronoun? (could hear|could see|could feel|could smell|could sense)',
     label: 'Sensory filter verb',
     advice: 'Filter phrases like "could hear/see/feel" create psychological distance. Describe the sensory event directly.',
   },
   {
-    pattern: /\b(he|she|they|I|we)\s+(heard|listened\s+as|listened\s+to)\b/gi,
+    query: '#Pronoun? (heard|listened as|listened to)',
     label: 'Auditory filter word',
     advice: 'Instead of stating that the character heard the sound, describe the acoustic detail directly in the prose.',
   },
   {
-    pattern: /\b(he|she|they|I|we)\s+(saw|watched\s+as|watched|gazed\s+at)\b/gi,
+    query: '#Pronoun? (saw|watched as|watched|gazed at)',
     label: 'Visual filter word',
     advice: 'Describing what the character "saw" or "watched" distances the reader. State the visual action directly.',
   },
   {
-    pattern: /\b(he|she|they|I|we)\s+(noticed\s+that|noticed|observed\s+that|observed)\b/gi,
+    query: '#Pronoun? (noticed that|noticed|observed that|observed)',
     label: 'Perception filter word',
     advice: 'Instead of reporting that the character "noticed" something, reveal the detail directly to the reader.',
   },
   {
-    pattern: /\b(he|she|they|I|we)\s+(felt\s+a\s+sudden|felt\s+a\s+wave\s+of|felt\s+the|felt\s+that)\b/gi,
+    query: '#Pronoun? (felt a sudden|felt a wave of|felt the|felt that)',
     label: 'Sensory feeling filter',
     advice: 'Showing visceral physical reactions directly is punchier than telling the reader the character "felt" it.',
   },
   {
-    pattern: /\b(he|she|they|I|we)\s+(realized\s+that|realized|wondered\s+if|wondered\s+whether)\b/gi,
+    query: '#Pronoun? (realized that|realized|wondered if|wondered whether)',
     label: 'Cognitive filter word',
     advice: 'Internal cognitive markers ("realized", "wondered") can pull readers out of deep immersion.',
   },
   {
-    pattern: /\b(he|she|they|I|we)\s+(decided\s+to)\b/gi,
+    query: '#Pronoun? (decided to)',
     label: 'Decision filter verb',
     advice: 'Instead of "decided to run", have the character directly perform the action ("ran").',
   },
 ];
 
-export function checkFilterWords(text: string): Suggestion[] {
+/**
+ * Detects sensory and cognitive filter words powered by spencermountain/compromise
+ * POS and pronoun-verb structure matching.
+ */
+export function checkFilterWords(
+  input: string | CompromiseDoc,
+  rawText?: string
+): Suggestion[] {
+  const doc = getNlpDoc(input);
+  const text = typeof input === 'string' ? input : (rawText ?? doc.text());
   const suggestions: Suggestion[] = [];
+  const seenSpans = new Set<string>();
 
-  for (const filter of FILTER_PATTERNS) {
-    const regex = new RegExp(filter.pattern.source, filter.pattern.flags);
-    let match: RegExpExecArray | null;
+  for (const filter of COMPROMISE_FILTER_PATTERNS) {
+    const matches = doc.match(filter.query).json({ offset: true }) as any[];
 
-    while ((match = regex.exec(text)) !== null) {
-      const fullMatch = match[0];
-      const startIndex = match.index;
-      const endIndex = startIndex + fullMatch.length;
+    for (const m of matches) {
+      if (!m.terms || m.terms.length === 0) continue;
+
+      const offsets = getMatchOffsets(m, text);
+      if (!offsets) continue;
+
+      const { startIndex, endIndex, matchedText } = offsets;
+      const spanKey = `${startIndex}-${endIndex}`;
+
+      if (seenSpans.has(spanKey)) continue;
+      seenSpans.add(spanKey);
 
       suggestions.push({
         id: `filter-${startIndex}-${endIndex}`,
         type: 'filter-word',
-        title: `Filter verb: "${fullMatch}"`,
+        title: `Filter verb: "${matchedText}"`,
         description: filter.advice,
-        originalText: fullMatch,
-        replacementText: fullMatch, // Educational suggestion (requires narrative restructuring)
+        originalText: matchedText,
+        replacementText: matchedText,
         startIndex,
         endIndex,
         ruleCategory: 'style',

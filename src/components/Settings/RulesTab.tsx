@@ -64,6 +64,17 @@ export const RulesTab: React.FC<RulesTabProps> = ({ rules, onToggle }) => {
 
   return (
     <div className="space-y-5 max-h-[460px] overflow-y-auto pr-1">
+      <div className="p-3 bg-stone-950/60 border border-stone-800/80 rounded flex items-center justify-between text-xs">
+        <div>
+          <span className="font-semibold text-stone-200">Compromise NLP Rule Engine</span>
+          <p className="text-[11px] text-stone-400 mt-0.5">
+            Deterministic writing passes and suggestions are parsed and evaluated locally via spencermountain/compromise.
+          </p>
+        </div>
+        <span className="text-[10px] bg-sky-950/80 text-sky-400 border border-sky-800/60 px-2 py-0.5 rounded font-mono flex-shrink-0">
+          compromise v14
+        </span>
+      </div>
       {renderSection('Grammar & Mechanics', grammarRules)}
       {renderSection('Style & Narrative Craft', styleRules)}
       {renderSection('Typography & Formatting', typographyRules)}

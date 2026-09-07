@@ -1,4 +1,5 @@
 import { Suggestion, UserRule } from '../../types/index.ts';
+import { getNlpDoc } from './compromise.ts';
 import { checkRepeatedWords } from './repeatedWords.ts';
 import { checkSentenceLength } from './sentenceLength.ts';
 import { checkPassiveVoice } from './passiveVoice.ts';
@@ -8,6 +9,21 @@ import { checkArticleAgreement } from './articleAgreement.ts';
 import { checkFilterWords } from './filterWords.ts';
 import { checkWeakWords, checkRedundantAdverbs, checkCliches } from './styleCraft.ts';
 
+export * from './compromise.ts';
+export * from './repeatedWords.ts';
+export * from './sentenceLength.ts';
+export * from './passiveVoice.ts';
+export * from './typography.ts';
+export * from './grammarConfusions.ts';
+export * from './articleAgreement.ts';
+export * from './filterWords.ts';
+export * from './styleCraft.ts';
+
+/**
+ * Runs all enabled deterministic suggestions and editorial passes
+ * powered by the spencermountain/compromise NLP engine.
+ * Initializes a single Compromise document per run for optimal performance.
+ */
 export function runAllChecks(
   text: string,
   rules: UserRule[],
@@ -15,39 +31,42 @@ export function runAllChecks(
 ): Suggestion[] {
   let suggestions: Suggestion[] = [];
 
+  // Parse text once with Compromise NLP
+  const doc = getNlpDoc(text);
+
   for (const rule of rules) {
     if (!rule.enabled) continue;
 
     switch (rule.category) {
       case 'repeated-word':
-        suggestions.push(...checkRepeatedWords(text, ignoredTerms));
+        suggestions.push(...checkRepeatedWords(doc, ignoredTerms, text));
         break;
       case 'sentence-length':
-        suggestions.push(...checkSentenceLength(text, rule.threshold || 30));
+        suggestions.push(...checkSentenceLength(doc, rule.threshold || 30, text));
         break;
       case 'passive-voice':
-        suggestions.push(...checkPassiveVoice(text));
+        suggestions.push(...checkPassiveVoice(doc, text));
         break;
       case 'typography':
-        suggestions.push(...checkTypography(text));
+        suggestions.push(...checkTypography(doc, text));
         break;
       case 'grammar-confusions':
-        suggestions.push(...checkGrammarConfusions(text, ignoredTerms));
+        suggestions.push(...checkGrammarConfusions(doc, ignoredTerms, text));
         break;
       case 'article-agreement':
-        suggestions.push(...checkArticleAgreement(text));
+        suggestions.push(...checkArticleAgreement(doc, text));
         break;
       case 'filter-words':
-        suggestions.push(...checkFilterWords(text));
+        suggestions.push(...checkFilterWords(doc, text));
         break;
       case 'weak-words':
-        suggestions.push(...checkWeakWords(text));
+        suggestions.push(...checkWeakWords(doc, text));
         break;
       case 'redundant-adverbs':
-        suggestions.push(...checkRedundantAdverbs(text));
+        suggestions.push(...checkRedundantAdverbs(doc, text));
         break;
       case 'cliches':
-        suggestions.push(...checkCliches(text));
+        suggestions.push(...checkCliches(doc, text));
         break;
     }
   }

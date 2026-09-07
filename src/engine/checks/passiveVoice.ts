@@ -1,64 +1,56 @@
 import { Suggestion } from '../../types/index.ts';
+import { getNlpDoc, CompromiseDoc, getMatchOffsets } from './compromise.ts';
 
-// Common irregular past participles + regular "-ed" forms
-const IRREGULAR_PAST_PARTICIPLES = new Set([
-  'been', 'done', 'seen', 'made', 'taken', 'known', 'given', 'found', 'told',
-  'become', 'shown', 'left', 'felt', 'brought', 'begun', 'kept', 'held', 'written',
-  'stood', 'heard', 'let', 'meant', 'set', 'met', 'run', 'paid', 'sat', 'spoken',
-  'lost', 'sent', 'built', 'understood', 'drawn', 'broken', 'spent', 'fallen',
-  'caught', 'grown', 'driven', 'chosen', 'worn', 'eaten', 'forgotten', 'thrown',
-  'hung', 'struck', 'slain', 'hidden', 'ridden', 'stolen', 'shaken', 'bitten'
+const FALSE_POSITIVES = new Set([
+  'red', 'bed', 'feed', 'need', 'seed', 'weed', 'speed',
+  'wet', 'glad', 'alive', 'awake', 'well', 'fine', 'ready'
 ]);
 
-// Passive auxiliaries: was, were, is, are, been, being, am, be
-const PASSIVE_AUXILIARIES = '\\b(am|is|are|was|were|being|been|be)\\b';
-
 /**
- * Detects passive voice constructions: [to be verb] + [optional adverb] + [past participle]
- * e.g., "was examined", "were quietly observed", "been hidden by"
+ * Detects passive voice constructions powered by spencermountain/compromise
+ * POS tagging and auxiliary-verb structure matching:
+ * e.g., "was examined", "were quietly observed", "has been hidden"
  */
-export function checkPassiveVoice(text: string): Suggestion[] {
+export function checkPassiveVoice(
+  input: string | CompromiseDoc,
+  rawText?: string
+): Suggestion[] {
+  const doc = getNlpDoc(input);
+  const text = typeof input === 'string' ? input : (rawText ?? doc.text());
   const suggestions: Suggestion[] = [];
-  
-  // Regex pattern: auxiliary + (optional adverb ending in ly) + candidate participle
-  const pattern = /\b(am|is|are|was|were|being|been|be)\s+(?:([a-zA-Z]+ly)\s+)?([a-zA-Z]+)\b/gi;
 
-  let match: RegExpExecArray | null;
-  while ((match = pattern.exec(text)) !== null) {
-    const fullMatch = match[0];
-    const aux = match[1];
-    const adverb = match[2];
-    const participleRaw = match[3];
-    if (!participleRaw) continue;
+  // Match auxiliary verb sequence followed by optional adverb and past participle / passive verb
+  const matches = doc.match('#Auxiliary+ #Adverb? (#PastTense|#Participle|#Passive)');
+  const jsonMatches = matches.json({ offset: true }) as any[];
 
-    const participle = participleRaw.toLowerCase();
+  for (const m of jsonMatches) {
+    if (!m.terms || m.terms.length < 2) continue;
 
-    // Check if participle ends with "ed" or is in the irregular list
-    const isPassiveParticiple = participle.endsWith('ed') || IRREGULAR_PAST_PARTICIPLES.has(participle);
+    const lastTerm = m.terms[m.terms.length - 1];
+    const normalVerb = (lastTerm.normal || lastTerm.text || '').toLowerCase();
 
-    // Filter out common false positives
-    const falsePositives = new Set(['red', 'bed', 'feed', 'need', 'seed', 'weed', 'speed']);
-    if (falsePositives.has(participle)) {
+    // Guard against predicate adjectives / non-participles
+    if (FALSE_POSITIVES.has(normalVerb)) {
       continue;
     }
 
-    if (isPassiveParticiple) {
-      const startIndex = match.index;
-      const endIndex = startIndex + fullMatch.length;
+    const offsets = getMatchOffsets(m, text);
+    if (!offsets) continue;
 
-      suggestions.push({
-        id: `pas-${startIndex}-${endIndex}`,
-        type: 'passive-voice',
-        title: `Passive construction: "${fullMatch}"`,
-        description: `Using passive voice ("${aux} ${adverb ? adverb + ' ' : ''}${participle}") can weaken narrative momentum. Consider using an active verb.`,
-        originalText: fullMatch,
-        replacementText: fullMatch,
-        startIndex,
-        endIndex,
-        ruleCategory: 'style',
-        severity: 'info',
-      });
-    }
+    const { startIndex, endIndex, matchedText } = offsets;
+
+    suggestions.push({
+      id: `pas-${startIndex}-${endIndex}`,
+      type: 'passive-voice',
+      title: `Passive construction: "${matchedText}"`,
+      description: `Using passive voice ("${matchedText}") can weaken narrative momentum. Consider using an active verb.`,
+      originalText: matchedText,
+      replacementText: matchedText,
+      startIndex,
+      endIndex,
+      ruleCategory: 'style',
+      severity: 'info',
+    });
   }
 
   return suggestions;
