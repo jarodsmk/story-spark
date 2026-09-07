@@ -47,6 +47,37 @@ export function App() {
   const [activeWordCount, setActiveWordCount] = useState<number>(0);
   const [openCoverModal, setOpenCoverModal] = useState(false);
   const [coverTargetNovel, setCoverTargetNovel] = useState<Novel | null>(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('story_spark_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleToggleSidebarCollapse = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('story_spark_sidebar_collapsed', String(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+
+  // Keyboard shortcut Ctrl+B or Cmd+B to toggle sidebar collapse
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
+        e.preventDefault();
+        handleToggleSidebarCollapse();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleOpenCoverUpload = (novel: Novel) => {
     setCoverTargetNovel(novel);
@@ -270,6 +301,8 @@ export function App() {
           setSummaryModalTargetFile(path || files.activeFilePath);
           setOpenSummariesModal(true);
         }}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={handleToggleSidebarCollapse}
       />
 
       <EditorContainer
@@ -324,6 +357,8 @@ export function App() {
           setSummaryModalTargetFile(files.activeFilePath);
           setOpenSummariesModal(true);
         }}
+        isSidebarCollapsed={isSidebarCollapsed}
+        onToggleSidebarCollapse={handleToggleSidebarCollapse}
       />
 
       <SettingsModal

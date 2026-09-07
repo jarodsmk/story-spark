@@ -15,6 +15,8 @@ import {
   Sparkles,
   Image as ImageIcon,
   Camera,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { FileItem } from '../../storage/fs.ts';
 import { Novel, SceneSummary } from '../../types/index.ts';
@@ -37,6 +39,8 @@ interface SidebarProps {
   onUploadCover?: (novel: Novel) => void;
   summaries?: Record<string, SceneSummary>;
   onOpenSceneSummaries?: (scenePath?: string) => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -57,6 +61,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onUploadCover,
   summaries = {},
   onOpenSceneSummaries,
+  isCollapsed = false,
+  onToggleCollapse,
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -78,6 +84,139 @@ export const Sidebar: React.FC<SidebarProps> = ({
     };
   }, [isDropdownOpen]);
 
+  if (isCollapsed) {
+    return (
+      <aside
+        aria-label="Left Menu (Collapsed)"
+        className="w-12 bg-stone-950 border-r border-stone-800 flex flex-col h-full flex-shrink-0 text-xs select-none items-center py-2.5 justify-between transition-all duration-150"
+      >
+        <div className="flex flex-col items-center space-y-2 w-full px-1">
+          {/* Expand toggle */}
+          <button
+            type="button"
+            id="sidebar-expand-toggle-btn"
+            onClick={onToggleCollapse}
+            title="Expand Left Menu (Ctrl+B)"
+            className="p-2 text-stone-400 hover:text-amber-400 hover:bg-stone-900 rounded transition-colors"
+          >
+            <PanelLeftOpen className="w-4 h-4" />
+          </button>
+
+          <div className="w-6 h-px bg-stone-800 my-1" />
+
+          {/* Active Novel Cover / Thumbnail */}
+          {activeNovel && (
+            <button
+              type="button"
+              id="sidebar-collapsed-novel-btn"
+              onClick={onOpenNovelManager}
+              title={`Active Novel: ${activeNovel.title} (${novels.length} total) - Click to manage`}
+              className="w-8 h-11 rounded bg-stone-950 border border-stone-800 hover:border-amber-500 overflow-hidden shadow-sm transition-all group flex items-center justify-center relative my-1 cursor-pointer"
+            >
+              {activeNovel.coverImage ? (
+                <img
+                  src={activeNovel.coverImage}
+                  alt={activeNovel.title}
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-stone-900 via-stone-950 to-stone-900 text-stone-600 group-hover:text-amber-400 transition-colors">
+                  <BookOpen className="w-3.5 h-3.5" />
+                </div>
+              )}
+            </button>
+          )}
+
+          {/* Quick Scene Action: New Scene */}
+          <button
+            type="button"
+            id="sidebar-collapsed-new-scene-btn"
+            onClick={onNewScene}
+            title="New Scene"
+            className="p-2 text-stone-400 hover:text-white hover:bg-stone-900 rounded transition-colors"
+          >
+            <FilePlus className="w-4 h-4" />
+          </button>
+
+          {/* Scene Summaries Button */}
+          {onOpenSceneSummaries && (
+            <button
+              type="button"
+              id="sidebar-collapsed-summaries-btn"
+              onClick={() => onOpenSceneSummaries()}
+              title="Scene Summaries & Context"
+              className="p-2 text-stone-400 hover:text-amber-400 hover:bg-stone-900 rounded transition-colors"
+            >
+              <Sparkles className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Novel Library */}
+          {onOpenNovelManager && (
+            <button
+              type="button"
+              id="sidebar-collapsed-library-btn"
+              onClick={onOpenNovelManager}
+              title="Novel Library & Manager"
+              className="p-2 text-stone-400 hover:text-amber-400 hover:bg-stone-900 rounded transition-colors"
+            >
+              <Library className="w-4 h-4" />
+            </button>
+          )}
+
+          <div className="w-6 h-px bg-stone-800 my-1" />
+
+          {/* Rotated label to click and expand */}
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className="group py-4 px-1 flex items-center justify-center cursor-pointer transition hover:bg-stone-900/60 rounded my-2"
+            title="Click to expand Left Menu"
+          >
+            <span
+              className="text-[10px] font-semibold tracking-wider uppercase whitespace-nowrap text-stone-500 group-hover:text-amber-400 transition"
+              style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+            >
+              {activeNovel ? activeNovel.title : 'MANUSCRIPT & LORE'}
+            </span>
+          </button>
+        </div>
+
+        {/* Bottom Utility Icons */}
+        <div className="flex flex-col items-center space-y-1.5 w-full px-1 pt-2 border-t border-stone-800">
+          <button
+            type="button"
+            id="sidebar-collapsed-import-btn"
+            onClick={onImportFile}
+            title="Import File"
+            className="p-2 text-stone-400 hover:text-stone-200 hover:bg-stone-900 rounded transition-colors"
+          >
+            <FolderDown className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            id="sidebar-collapsed-compile-btn"
+            onClick={onExportCompiled}
+            title="Compile Novel"
+            className="p-2 text-stone-400 hover:text-stone-200 hover:bg-stone-900 rounded transition-colors"
+          >
+            <BookText className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            id="sidebar-collapsed-settings-btn"
+            onClick={onOpenSettings}
+            title="Settings & Rules"
+            className="p-2 text-stone-400 hover:text-stone-200 hover:bg-stone-900 rounded transition-colors"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+        </div>
+      </aside>
+    );
+  }
+
   return (
     <div className="w-60 bg-stone-950 border-r border-stone-800 flex flex-col h-full flex-shrink-0 text-xs select-none">
       {/* Brand Header */}
@@ -90,15 +229,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {onOpenNovelManager && (
-          <button
-            onClick={onOpenNovelManager}
-            title="Open Novel Library & Manager"
-            className="p-1 text-stone-400 hover:text-amber-400 hover:bg-stone-900 rounded transition-colors"
-          >
-            <Library className="w-3.5 h-3.5" />
-          </button>
-        )}
+        <div className="flex items-center space-x-1">
+          {onOpenNovelManager && (
+            <button
+              onClick={onOpenNovelManager}
+              title="Open Novel Library & Manager"
+              className="p-1 text-stone-400 hover:text-amber-400 hover:bg-stone-900 rounded transition-colors"
+            >
+              <Library className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {onToggleCollapse && (
+            <button
+              id="sidebar-collapse-toggle-btn"
+              onClick={onToggleCollapse}
+              title="Collapse Left Menu (Ctrl+B)"
+              className="p-1 text-stone-400 hover:text-amber-400 hover:bg-stone-900 rounded transition-colors"
+            >
+              <PanelLeftClose className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Novel Selector Banner */}

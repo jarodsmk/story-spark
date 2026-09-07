@@ -16,6 +16,8 @@ import {
   ChevronUp,
   ChevronDown,
   Crosshair,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { SuggestionCard } from './SuggestionCard.tsx';
 
@@ -35,6 +37,8 @@ interface SuggestionsPaneProps {
   onClearAI?: () => void;
   isAnalyzingAI?: boolean;
   activeFileName?: string;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export const SuggestionsPane: React.FC<SuggestionsPaneProps> = ({
@@ -53,6 +57,8 @@ export const SuggestionsPane: React.FC<SuggestionsPaneProps> = ({
   onClearAI,
   isAnalyzingAI = false,
   activeFileName = 'Active Scene',
+  isCollapsed = false,
+  onToggleCollapse,
 }) => {
   const [activeFilter, setActiveFilter] = useState<string>('all');
   const [customInstruction, setCustomInstruction] = useState('');
@@ -156,22 +162,106 @@ export const SuggestionsPane: React.FC<SuggestionsPaneProps> = ({
     }
   };
 
+  if (isCollapsed) {
+    return (
+      <aside
+        aria-label="Suggestions & Passes (Collapsed)"
+        className="h-full bg-stone-900 border-r border-stone-800 flex flex-col items-center justify-between py-3 w-11 flex-shrink-0 select-none transition-all"
+      >
+        <div className="flex flex-col items-center space-y-3">
+          <button
+            type="button"
+            id="suggestions-pane-expand-btn"
+            onClick={onToggleCollapse}
+            title="Expand Suggestions & Passes pane"
+            className="p-2 rounded hover:bg-stone-800 text-stone-400 hover:text-amber-400 transition"
+          >
+            <PanelLeftOpen className="w-4 h-4" />
+          </button>
+
+          {/* Suggestions count badge / trigger */}
+          {suggestions.length > 0 ? (
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              title={`${suggestions.length} suggestions pending - Click to expand`}
+              className="p-1 rounded bg-amber-950/80 border border-amber-800/60 hover:border-amber-500 text-amber-300 transition flex flex-col items-center gap-0.5 cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span className="text-[10px] font-mono font-bold leading-none">{suggestions.length}</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              title="Expand Suggestions & Passes"
+              className="p-1.5 rounded hover:bg-stone-800 text-stone-500 hover:text-amber-400 transition cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {aiCount > 0 && (
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              title={`${aiCount} AI editorial passes ready - Click to view`}
+              className="px-1 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-800/50 text-[9px] font-mono hover:bg-amber-900/60 transition cursor-pointer"
+            >
+              {aiCount} AI
+            </button>
+          )}
+
+          <div className="w-4 h-px bg-stone-800 my-1" />
+
+          {/* Vertical rotated label */}
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className="group py-4 px-1 flex items-center justify-center cursor-pointer transition hover:bg-stone-800/40 rounded"
+            title="Click to expand Suggestions & Passes pane"
+          >
+            <span
+              className="text-[11px] font-medium tracking-wider uppercase whitespace-nowrap text-stone-400 group-hover:text-amber-300 transition"
+              style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+            >
+              SUGGESTIONS & PASSES {suggestions.length > 0 ? `(${suggestions.length})` : ''}
+            </span>
+          </button>
+        </div>
+
+        <div className="flex flex-col items-center space-y-2">
+          {hasSelection && (
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              title="Selection active - Click to open rewrite pass"
+              className="p-1.5 rounded hover:bg-stone-800 text-amber-400 transition"
+            >
+              <Wand2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </aside>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-stone-900 border-r border-stone-800">
       {/* Pane Header */}
-      <div className="h-12 border-b border-stone-800 px-4 flex items-center justify-between bg-stone-950/40">
-        <div className="flex items-center space-x-2">
-          <Sparkles className="w-4 h-4 text-amber-500" />
-          <span className="font-medium text-sm text-stone-200">Suggestions & Passes</span>
-          <span className="text-[10px] bg-sky-950/70 text-sky-400 border border-sky-800/50 px-1.5 py-0.5 rounded font-mono">
+      <div className="h-12 border-b border-stone-800 px-3 sm:px-4 flex items-center justify-between bg-stone-950/40">
+        <div className="flex items-center space-x-2 truncate">
+          <Sparkles className="w-4 h-4 text-amber-500 flex-shrink-0" />
+          <span className="font-medium text-sm text-stone-200 truncate">Suggestions & Passes</span>
+          <span className="text-[10px] bg-sky-950/70 text-sky-400 border border-sky-800/50 px-1.5 py-0.5 rounded font-mono hidden xl:inline">
             Compromise NLP
           </span>
-          <span className="text-xs bg-stone-800 text-stone-300 px-2 py-0.5 rounded-full font-mono">
+          <span className="text-xs bg-stone-800 text-stone-300 px-2 py-0.5 rounded-full font-mono flex-shrink-0">
             {suggestions.length}
           </span>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1.5 flex-shrink-0">
           {/* Quick Cycle Navigation Buttons */}
           {filtered.length > 0 && (
             <div className="flex items-center space-x-1 bg-stone-950 border border-stone-800 px-1 py-0.5 rounded">
@@ -204,10 +294,22 @@ export const SuggestionsPane: React.FC<SuggestionsPaneProps> = ({
           )}
 
           {aiCount > 0 && (
-            <span className="text-[10px] bg-amber-950 text-amber-300 border border-amber-800/60 px-2 py-0.5 rounded-full font-mono flex items-center gap-1">
+            <span className="text-[10px] bg-amber-950 text-amber-300 border border-amber-800/60 px-2 py-0.5 rounded-full font-mono flex items-center gap-1 hidden sm:flex">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
               {aiCount} AI
             </span>
+          )}
+
+          {onToggleCollapse && (
+            <button
+              id="suggestions-pane-collapse-btn"
+              type="button"
+              onClick={onToggleCollapse}
+              title="Collapse Suggestions & Passes pane"
+              className="p-1 text-stone-400 hover:text-amber-400 hover:bg-stone-800 rounded transition-colors ml-1"
+            >
+              <PanelLeftClose className="w-3.5 h-3.5" />
+            </button>
           )}
         </div>
       </div>

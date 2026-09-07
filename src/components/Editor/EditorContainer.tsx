@@ -47,6 +47,8 @@ interface EditorContainerProps {
   priorSceneSummaries?: Array<{ title: string; summary: string }>;
   allSceneSummaries?: Array<{ title: string; summary: string }>;
   onOpenSceneSummary?: () => void;
+  isSidebarCollapsed?: boolean;
+  onToggleSidebarCollapse?: () => void;
 }
 
 export const EditorContainer: React.FC<EditorContainerProps> = ({
@@ -87,11 +89,20 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
   priorSceneSummaries,
   allSceneSummaries,
   onOpenSceneSummary,
+  isSidebarCollapsed,
+  onToggleSidebarCollapse,
 }) => {
   const [selectedSuggestionId, setSelectedSuggestionId] = useState<string | null>(null);
   const [isDiffCollapsed, setIsDiffCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem('story_spark_diff_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [isSuggestionsCollapsed, setIsSuggestionsCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('story_spark_suggestions_collapsed') === 'true';
     } catch {
       return false;
     }
@@ -109,12 +120,28 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
     });
   };
 
-  // Keyboard shortcut Ctrl+\ or Cmd+\ to quickly toggle the Diff pane
+  const handleToggleSuggestionsCollapse = () => {
+    setIsSuggestionsCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('story_spark_suggestions_collapsed', String(next));
+      } catch {
+        // ignore storage errors
+      }
+      return next;
+    });
+  };
+
+  // Keyboard shortcut Ctrl+\ or Cmd+\ to quickly toggle Diff pane, Ctrl+[ or Cmd+[ for Suggestions pane
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === '\\') {
         e.preventDefault();
         handleToggleDiffCollapse();
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === '[' || e.key === ']')) {
+        e.preventDefault();
+        handleToggleSuggestionsCollapse();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -147,8 +174,12 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
 
   return (
     <div className="flex-1 flex overflow-hidden">
-      {/* 1. Left Pane: Suggestions & Passes */}
-      <div className="w-[28%] min-w-[280px] max-w-[380px] h-full flex-shrink-0">
+      {/* 1. Left Pane: Suggestions & Passes (Collapsible) */}
+      <div
+        className={`${
+          isSuggestionsCollapsed ? 'w-11' : 'w-[28%] min-w-[280px] max-w-[380px]'
+        } h-full flex-shrink-0 transition-all duration-150`}
+      >
         <SuggestionsPane
           suggestions={suggestions}
           selectedSuggestionId={selectedSuggestionId}
@@ -165,10 +196,12 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
           onClearAI={onClearAI}
           isAnalyzingAI={isAnalyzingAI}
           activeFileName={activeFileName}
+          isCollapsed={isSuggestionsCollapsed}
+          onToggleCollapse={handleToggleSuggestionsCollapse}
         />
       </div>
 
-      {/* 2. Central Pane: Manuscript Text Viewing & Editing (expands when Diff is collapsed) */}
+      {/* 2. Central Pane: Manuscript Text Viewing & Editing (expands when side panes are collapsed) */}
       <div className="flex-1 min-w-0 h-full">
         <SourcePane
           content={content}
@@ -183,6 +216,11 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
           onDismissSuggestion={handleDismiss}
           isDiffCollapsed={isDiffCollapsed}
           onToggleDiffCollapse={handleToggleDiffCollapse}
+          isSuggestionsCollapsed={isSuggestionsCollapsed}
+          onToggleSuggestionsCollapse={handleToggleSuggestionsCollapse}
+          suggestionsCount={suggestions.length}
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleSidebarCollapse={onToggleSidebarCollapse}
           loreEntries={loreEntries}
           loreCharacters={loreCharacters}
           loreWorld={loreWorld}

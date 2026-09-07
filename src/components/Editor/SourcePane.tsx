@@ -6,6 +6,7 @@ import {
   Check,
   X,
   PanelRightOpen,
+  PanelLeftOpen,
   Edit3,
   Sparkles,
   User,
@@ -39,6 +40,11 @@ interface SourcePaneProps {
   onDismissSuggestion?: (suggestion: Suggestion) => void;
   isDiffCollapsed?: boolean;
   onToggleDiffCollapse?: () => void;
+  isSuggestionsCollapsed?: boolean;
+  onToggleSuggestionsCollapse?: () => void;
+  suggestionsCount?: number;
+  isSidebarCollapsed?: boolean;
+  onToggleSidebarCollapse?: () => void;
   loreEntries?: LoreEntry[];
   loreCharacters?: LoreEntry[];
   loreWorld?: LoreEntry[];
@@ -71,6 +77,11 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
   onDismissSuggestion,
   isDiffCollapsed,
   onToggleDiffCollapse,
+  isSuggestionsCollapsed,
+  onToggleSuggestionsCollapse,
+  suggestionsCount,
+  isSidebarCollapsed,
+  onToggleSidebarCollapse,
   loreEntries = [],
   loreCharacters = [],
   loreWorld = [],
@@ -440,6 +451,37 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
       {/* Pane Header */}
       <div className="h-12 border-b border-stone-800 px-4 flex items-center justify-between bg-stone-950/40 flex-shrink-0">
         <div className="flex items-center space-x-2 truncate">
+          {isSidebarCollapsed && onToggleSidebarCollapse && (
+            <button
+              id="source-pane-show-sidebar-btn"
+              type="button"
+              onClick={onToggleSidebarCollapse}
+              title="Expand Left Menu (Ctrl+B)"
+              className="flex items-center gap-1 text-xs text-stone-400 hover:text-amber-300 bg-stone-800/80 hover:bg-stone-800 px-2 py-0.5 rounded transition border border-stone-700/50 mr-1 flex-shrink-0"
+            >
+              <PanelLeftOpen className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Menu</span>
+            </button>
+          )}
+
+          {isSuggestionsCollapsed && onToggleSuggestionsCollapse && (
+            <button
+              id="source-pane-show-suggestions-btn"
+              type="button"
+              onClick={onToggleSuggestionsCollapse}
+              title="Expand Suggestions & Passes pane (Ctrl+[)"
+              className="flex items-center gap-1.5 text-xs text-stone-400 hover:text-amber-300 bg-stone-800/80 hover:bg-stone-800 px-2 py-0.5 rounded transition border border-stone-700/50 mr-1 flex-shrink-0"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Suggestions</span>
+              {suggestionsCount !== undefined && suggestionsCount > 0 && (
+                <span className="text-[10px] font-mono font-bold bg-amber-950/80 text-amber-300 px-1 rounded-full border border-amber-800/60">
+                  {suggestionsCount}
+                </span>
+              )}
+            </button>
+          )}
+
           <FileText className="w-4 h-4 text-amber-500 flex-shrink-0" />
           <span className="font-medium text-sm text-stone-200 truncate">{title}</span>
 
