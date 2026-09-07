@@ -125,6 +125,7 @@ router.post('/generate', async (req: Request, res: Response) => {
       customStyle,
       selectedText,
       surroundingContext,
+      sceneSummaries,
       temperature = 0.75,
     } = req.body;
 
@@ -189,6 +190,17 @@ router.post('/generate', async (req: Request, res: Response) => {
 
     let userMessage = `Content Description / Instructions:\n${prompt.trim()}\n\n${lengthGuidance}\n${styleGuidance}`;
 
+    // Include scene summaries for narrative context
+    if (Array.isArray(sceneSummaries) && sceneSummaries.length > 0) {
+      const formattedSummaries = sceneSummaries
+        .filter(s => s && s.summary && s.summary.trim())
+        .map((s, idx) => `[Scene ${idx + 1}: ${s.title || 'Untitled'}]\n${s.summary.trim()}`)
+        .join('\n\n');
+      if (formattedSummaries) {
+        userMessage += `\n\nNovel Scene Summaries (Chronological Story Context):\n"""\n${formattedSummaries}\n"""`;
+      }
+    }
+
     if (selectedText && selectedText.trim()) {
       userMessage += `\n\nReference / Selected Passage in Scene:\n"""\n${selectedText.trim()}\n"""`;
     }
@@ -224,6 +236,198 @@ router.post('/generate', async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('[Gemini /generate error]', err);
     res.status(500).json({ error: err.message || 'AI content generation failed' });
+  }
+});
+
+/**
+ * Generate concise, narrative-rich summary of a scene for story context
+ */
+router.post('/summarize-scene', async (req: Request, res: Response) => {
+  try {
+    const { sceneContent, sceneTitle, instructions } = req.body;
+
+    if (!sceneContent || typeof sceneContent !== 'string' || !sceneContent.trim()) {
+      return res.status(400).json({ error: 'Missing sceneContent to summarize.' });
+    }
+
+    const systemInstruction =
+      'You are an expert fiction novelist, story editor, and manuscript analyst. ' +
+      'Generate a concise, information-dense summary of the provided fiction scene (approximately 60 to 120 words). ' +
+      'Focus strictly on: ' +
+      '1. Key plot developments and revelations that occurred in this scene. ' +
+      '2. Main characters present, their core motivations, interactions, and emotional shifts. ' +
+      '3. The immediate ending state, unresolved conflicts, or narrative hook setting up subsequent scenes. ' +
+      'Do NOT include any meta-commentary, introductory remarks ("In this scene..."), bullet formatting, or conversational tone. ' +
+      'Output ONLY the single, cohesive narrative summary paragraph, crafted specifically to serve as background context for AI story continuation and plotting.';
+
+    let promptText = `Scene Title: ${sceneTitle || 'Untitled Scene'}\n\n`;
+    if (instructions) {
+      promptText += `Specific Instructions: ${instructions}\n\n`;
+    }
+    promptText += `Scene Content to Summarize:\n"""\n${sceneContent.trim()}\n"""`;
+
+    let summary = await generateWithGemini({
+      contents: promptText,
+      systemInstruction,
+      temperature: 0.4,
+    });
+
+    summary = summary.trim();
+    if (summary.startsWith('"""') && summary.endsWith('"""')) {
+      summary = summary.slice(3, -3).trim();
+    } else if (summary.startsWith('```markdown') && summary.endsWith('```')) {
+      summary = summary.slice(11, -3).trim();
+    } else if (summary.startsWith('```') && summary.endsWith('```')) {
+      summary = summary.slice(3, -3).trim();
+    }
+
+    const wordCount = summary.split(/\s+/).filter(w => w.length > 0).length;
+
+    res.json({
+      summary,
+      wordCount,
+      sceneTitle: sceneTitle || 'Untitled Scene',
+    });
+  } catch (err: any) {
+    console.error('[Gemini /summarize-scene error]', err);
+    res.status(500).json({ error: err.message || 'Scene summarization failed' });
+  }
+});
+
+/**
+ * Generate brainstormed story suggestions & narrative ideas involving characters, lore, and scene summaries
+ */
+router.post('/story-suggestions', async (req: Request, res: Response) => {
+  try {
+    const {
+      focusType = 'all',
+      customGuidance = '',
+      characters = [],
+      lore = [],
+      selectedSceneSummaries = [],
+      currentSceneTitle = '',
+      surroundingContext = '',
+      count = 4,
+    } = req.body;
+
+    const systemInstruction =
+      'You are a world-class fiction story consultant, narrative architect, and creative brainstorming partner for authors. ' +
+      'Your goal is to provide deeply engaging, unexpected, high-stakes narrative suggestions that advance the story logically and dramatically. ' +
+      'MANDATORY RULES:\n' +
+      '1. Ground your ideas in the user’s selected scene summaries, respecting established continuity and consequences.\n' +
+      '2. Actively incorporate the provided characters, their personalities, secrets, and relational conflicts.\n' +
+      '3. Actively weave in the specified world lore, factions, magic/technology rules, or key locations.\n' +
+      '4. Avoid generic tropes; push for compelling ethical dilemmas, dramatic irony, unexpected revelations, and visceral scene hooks.\n' +
+      '5. You must output strictly valid JSON matching the required schema with a "suggestions" array.';
+
+    let prompt = `Current Working Scene: ${currentSceneTitle || 'Untitled Scene'}\n`;
+
+    if (focusType && focusType !== 'all') {
+      prompt += `Brainstorm Category Focus: ${focusType}\n`;
+    }
+
+    if (customGuidance && typeof customGuidance === 'string' && customGuidance.trim()) {
+      prompt += `Author's Creative Goal / Guidance: ${customGuidance.trim()}\n`;
+    }
+
+    if (Array.isArray(characters) && characters.length > 0) {
+      prompt += `\nExisting Characters to Involve:\n`;
+      characters.forEach((c: any) => {
+        const charName = c.name || 'Unnamed';
+        const role = c.role ? ` (${c.role})` : '';
+        const summary = c.summary ? `: ${c.summary}` : '';
+        prompt += `- ${charName}${role}${summary}\n`;
+      });
+    }
+
+    if (Array.isArray(lore) && lore.length > 0) {
+      prompt += `\nExisting World Lore / Settings to Weave in:\n`;
+      lore.forEach((l: any) => {
+        const loreName = l.name || 'Unnamed Lore';
+        const cat = l.category ? ` [${l.category}]` : '';
+        const summary = l.summary ? `: ${l.summary}` : '';
+        prompt += `- ${loreName}${cat}${summary}\n`;
+      });
+    }
+
+    if (Array.isArray(selectedSceneSummaries) && selectedSceneSummaries.length > 0) {
+      prompt += `\nTimeline Scene Summaries (Chronological Story Context):\n"""\n`;
+      selectedSceneSummaries.forEach((s: any, idx: number) => {
+        prompt += `[Scene ${idx + 1}: ${s.title || 'Scene'}]\n${s.summary}\n\n`;
+      });
+      prompt += `"""\n`;
+    }
+
+    if (surroundingContext && typeof surroundingContext === 'string' && surroundingContext.trim()) {
+      const excerpt = surroundingContext.trim().slice(-1000);
+      prompt += `\nRecent Scene Manuscript Excerpt:\n"""\n${excerpt}\n"""\n`;
+    }
+
+    prompt += `\nGenerate exactly ${Math.min(Math.max(count || 4, 1), 6)} distinct story suggestions.\n` +
+      `Format your output as a JSON object with this exact structure:\n` +
+      `{\n` +
+      `  "suggestions": [\n` +
+      `    {\n` +
+      `      "id": "sug_1",\n` +
+      `      "title": "Evocative, compelling title for the idea",\n` +
+      `      "type": "plot_twist" | "character_conflict" | "lore_revelation" | "subplot" | "scene_beat",\n` +
+      `      "involvedCharacters": ["Character Name 1", "Character Name 2"],\n` +
+      `      "involvedLore": ["Location or Lore Item 1"],\n` +
+      `      "premise": "2-3 vivid sentences describing what happens, what is discovered, or how events unfold.",\n` +
+      `      "dramaticConflict": "The core stakes, emotional tension, or moral dilemma confronting the characters.",\n` +
+      `      "suggestedSceneHook": "Specific actionable beat or opening sentence/dialogue to write next in the scene."\n` +
+      `    }\n` +
+      `  ]\n` +
+      `}`;
+
+    const rawResponse = await generateWithGemini({
+      contents: prompt,
+      systemInstruction,
+      responseMimeType: 'application/json',
+      temperature: 0.8,
+    });
+
+    let cleaned = rawResponse.trim();
+    if (cleaned.startsWith('```json')) {
+      cleaned = cleaned.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
+    } else if (cleaned.startsWith('```')) {
+      cleaned = cleaned.replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+    }
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch (parseErr) {
+      // Fallback: search for JSON object within text
+      const firstBrace = cleaned.indexOf('{');
+      const lastBrace = cleaned.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace > firstBrace) {
+        parsed = JSON.parse(cleaned.slice(firstBrace, lastBrace + 1));
+      } else {
+        throw new Error('Failed to parse story suggestions JSON from Gemini response.');
+      }
+    }
+
+    const suggestionsList = Array.isArray(parsed?.suggestions) ? parsed.suggestions : [];
+    const sanitizedSuggestions = suggestionsList.map((s: any, idx: number) => ({
+      id: s.id || `sug_${Date.now()}_${idx}`,
+      title: String(s.title || `Story Idea ${idx + 1}`).trim(),
+      type: ['plot_twist', 'character_conflict', 'lore_revelation', 'subplot', 'scene_beat'].includes(s.type)
+        ? s.type
+        : 'general',
+      involvedCharacters: Array.isArray(s.involvedCharacters) ? s.involvedCharacters.map(String) : [],
+      involvedLore: Array.isArray(s.involvedLore) ? s.involvedLore.map(String) : [],
+      premise: String(s.premise || '').trim(),
+      dramaticConflict: String(s.dramaticConflict || '').trim(),
+      suggestedSceneHook: String(s.suggestedSceneHook || '').trim(),
+    }));
+
+    res.json({
+      suggestions: sanitizedSuggestions,
+    });
+  } catch (err: any) {
+    console.error('[Gemini /story-suggestions error]', err);
+    res.status(500).json({ error: err.message || 'Failed to generate story suggestions' });
   }
 });
 

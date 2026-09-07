@@ -12,9 +12,10 @@ import {
   Plus,
   Check,
   BookOpen,
+  Sparkles,
 } from 'lucide-react';
 import { FileItem } from '../../storage/fs.ts';
-import { Novel } from '../../types/index.ts';
+import { Novel, SceneSummary } from '../../types/index.ts';
 
 interface SidebarProps {
   sceneFiles: FileItem[];
@@ -31,6 +32,8 @@ interface SidebarProps {
   activeNovel?: Novel;
   onSelectNovel?: (id: string) => void;
   onOpenNovelManager?: () => void;
+  summaries?: Record<string, SceneSummary>;
+  onOpenSceneSummaries?: (scenePath?: string) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -48,6 +51,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeNovel,
   onSelectNovel,
   onOpenNovelManager,
+  summaries = {},
+  onOpenSceneSummaries,
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -175,22 +180,72 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="flex items-center gap-1 font-medium text-[10px] uppercase">
               <BookText className="w-3 h-3 text-amber-500" /> Scenes ({sceneFiles.length})
             </span>
-            <button onClick={onNewScene} className="p-0.5 hover:text-white"><FilePlus className="w-3.5 h-3.5" /></button>
-          </div>
-          {sceneFiles.map(f => (
-            <div
-              key={f.path}
-              onClick={() => onSelectFile(f.path)}
-              className={`group flex items-center justify-between px-2 py-1 rounded cursor-pointer ${
-                activeFilePath === f.path ? 'bg-amber-950/60 text-amber-200 border border-amber-800/50' : 'text-stone-400 hover:bg-stone-900'
-              }`}
-            >
-              <span className="truncate">{f.name.replace(/\.md$/, '').replace(/^\d+-/, '')}</span>
-              <button onClick={(e) => { e.stopPropagation(); onDeleteFile(f.path); }} className="opacity-0 group-hover:opacity-100 text-stone-500 hover:text-rose-400">
-                <Trash2 className="w-3 h-3" />
+            <div className="flex items-center gap-1">
+              <button
+                id="sidebar-open-scene-summaries-btn"
+                onClick={() => onOpenSceneSummaries?.()}
+                title="Scene Summaries & LLM Context Overview"
+                className="p-0.5 hover:text-amber-400 text-stone-500 rounded transition-colors"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+              </button>
+              <button onClick={onNewScene} title="New Scene" className="p-0.5 hover:text-white rounded transition-colors">
+                <FilePlus className="w-3.5 h-3.5" />
               </button>
             </div>
-          ))}
+          </div>
+          {sceneFiles.map(f => {
+            const sumObj = summaries[f.path];
+            const hasSummary = Boolean(sumObj?.summary?.trim());
+            return (
+              <div
+                key={f.path}
+                onClick={() => onSelectFile(f.path)}
+                className={`group flex items-center justify-between px-2 py-1 rounded cursor-pointer ${
+                  activeFilePath === f.path ? 'bg-amber-950/60 text-amber-200 border border-amber-800/50' : 'text-stone-400 hover:bg-stone-900'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 truncate flex-1 min-w-0 mr-1">
+                  <span className="truncate">{f.name.replace(/\.md$/, '').replace(/^\d+-/, '')}</span>
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {hasSummary ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenSceneSummaries?.(f.path);
+                      }}
+                      title={`Scene Summary (${sumObj.wordCount || 'active'} words) - Click to view`}
+                      className="text-amber-400/80 hover:text-amber-300 p-0.5 transition-colors"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenSceneSummaries?.(f.path);
+                      }}
+                      title="Generate Scene Summary"
+                      className="opacity-0 group-hover:opacity-100 text-stone-600 hover:text-amber-400 p-0.5 transition-colors"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onDeleteFile(f.path); }}
+                    title="Delete Scene"
+                    className="opacity-0 group-hover:opacity-100 text-stone-500 hover:text-rose-400 p-0.5 transition-colors"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {/* Characters */}

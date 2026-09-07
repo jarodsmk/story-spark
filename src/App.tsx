@@ -10,11 +10,13 @@ import { useProjectFiles } from './hooks/useProjectFiles.ts';
 import { useProjectSettings } from './hooks/useProjectSettings.ts';
 import { useManuscriptActions } from './hooks/useManuscriptActions.ts';
 import { useLoreManager } from './hooks/useLoreManager.ts';
+import { useSceneSummaries } from './hooks/useSceneSummaries.ts';
 
 import { Sidebar } from './components/Navigation/Sidebar.tsx';
 import { EditorContainer } from './components/Editor/EditorContainer.tsx';
 import { SettingsModal } from './components/Settings/SettingsModal.tsx';
 import { ModalsContainer } from './components/Modals/ModalsContainer.tsx';
+import { SceneSummaryModal } from './components/Modals/SceneSummaryModal.tsx';
 
 export function App() {
   const novelsState = useNovels();
@@ -22,6 +24,11 @@ export function App() {
   const settings = useProjectSettings();
   const hist = useHistory<string>('');
   const lore = useLoreManager(novelsState.activeNovelId, files.bibleFiles);
+  const sceneSummaries = useSceneSummaries(
+    novelsState.activeNovelId,
+    files.sceneFiles,
+    settings.llmSettings
+  );
 
   const [baseline, setBaseline] = useState('');
   const [saving, setSaving] = useState(false);
@@ -30,6 +37,8 @@ export function App() {
   const [openSettings, setOpenSettings] = useState(false);
   const [openImport, setOpenImport] = useState(false);
   const [openNovelManager, setOpenNovelManager] = useState(false);
+  const [openSummariesModal, setOpenSummariesModal] = useState(false);
+  const [summaryModalTargetFile, setSummaryModalTargetFile] = useState<string>('');
   const [genAI, setGenAI] = useState(false);
   const [aiErr, setAiErr] = useState<string | null>(null);
   const [aiSuggestions, setAiSuggestions] = useState<Suggestion[]>([]);
@@ -100,6 +109,16 @@ export function App() {
       setSaving(false);
     }, 600);
   };
+
+  const priorSummaries = useMemo(() => {
+    return sceneSummaries.getPriorSceneSummaries(files.activeFilePath);
+  }, [sceneSummaries, files.activeFilePath]);
+
+  const allSummaries = useMemo(() => {
+    return sceneSummaries.getAllSceneSummaries();
+  }, [sceneSummaries]);
+
+  const currentSummary = sceneSummaries.getSummary(files.activeFilePath);
 
   const ignoredSet = useMemo(() => new Set(settings.ignoredTerms.map(t => t.term.toLowerCase())), [settings.ignoredTerms]);
 
@@ -238,6 +257,11 @@ export function App() {
         activeNovel={novelsState.activeNovel}
         onSelectNovel={novelsState.selectNovel}
         onOpenNovelManager={() => setOpenNovelManager(true)}
+        summaries={sceneSummaries.summaries}
+        onOpenSceneSummaries={(path) => {
+          setSummaryModalTargetFile(path || files.activeFilePath);
+          setOpenSummariesModal(true);
+        }}
       />
 
       <EditorContainer
@@ -284,6 +308,14 @@ export function App() {
         onCreateLoreEntry={handleCreateLoreEntry}
         onOpenFile={loadFile}
         llmSettings={settings.llmSettings}
+        currentSceneSummary={currentSummary?.summary}
+        currentSceneSummaryWordCount={currentSummary?.wordCount}
+        priorSceneSummaries={priorSummaries}
+        allSceneSummaries={allSummaries}
+        onOpenSceneSummary={() => {
+          setSummaryModalTargetFile(files.activeFilePath);
+          setOpenSummariesModal(true);
+        }}
       />
 
       <SettingsModal
@@ -321,6 +353,38 @@ export function App() {
         onImportNovelCrafter={novelsState.importNovelCrafter}
         novelTitle={novelsState.activeNovel?.title}
         activeWordCount={activeWordCount}
+      />
+
+      <SceneSummaryModal
+        isOpen={openSummariesModal}
+        onClose={() => setOpenSummariesModal(false)}
+        currentFilePath={summaryModalTargetFile || files.activeFilePath}
+        currentFileTitle={
+          files.sceneFiles.find(
+            (f) => f.path === (summaryModalTargetFile || files.activeFilePath)
+          )?.name.replace(/\.md$/, '').replace(/^\d+-/, '') ||
+          files.activeFileName.replace(/\.md$/, '').replace(/^\d+-/, '')
+        }
+        currentContent={
+          summaryModalTargetFile === files.activeFilePath || !summaryModalTargetFile
+            ? hist.state
+            : ''
+        }
+        sceneFiles={files.sceneFiles}
+        summaries={sceneSummaries.summaries}
+        onGenerateSummary={sceneSummaries.generateSummaryForScene}
+        onSaveSummary={sceneSummaries.saveSummary}
+        onDeleteSummary={sceneSummaries.deleteSummary}
+        onGenerateAllMissing={() =>
+          sceneSummaries.generateAllMissingSummaries(settings.llmSettings)
+        }
+        isGenerating={sceneSummaries.isGenerating}
+        generatingPath={sceneSummaries.generatingPath}
+        batchProgress={sceneSummaries.batchProgress}
+        error={sceneSummaries.error}
+        onSelectScene={(p) => {
+          loadFile(p);
+        }}
       />
     </div>
   );

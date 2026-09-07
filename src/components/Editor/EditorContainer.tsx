@@ -42,6 +42,11 @@ interface EditorContainerProps {
   ) => Promise<LoreEntry>;
   onOpenFile?: (path: string) => void;
   llmSettings?: LLMSettings;
+  currentSceneSummary?: string;
+  currentSceneSummaryWordCount?: number;
+  priorSceneSummaries?: Array<{ title: string; summary: string }>;
+  allSceneSummaries?: Array<{ title: string; summary: string }>;
+  onOpenSceneSummary?: () => void;
 }
 
 export const EditorContainer: React.FC<EditorContainerProps> = ({
@@ -77,6 +82,11 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
   onCreateLoreEntry,
   onOpenFile,
   llmSettings,
+  currentSceneSummary,
+  currentSceneSummaryWordCount,
+  priorSceneSummaries,
+  allSceneSummaries,
+  onOpenSceneSummary,
 }) => {
   const [selectedSuggestionId, setSelectedSuggestionId] = useState<string | null>(null);
   const [isDiffCollapsed, setIsDiffCollapsed] = useState<boolean>(() => {
@@ -181,6 +191,11 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
           onCreateLoreEntry={onCreateLoreEntry}
           onOpenFile={onOpenFile}
           llmSettings={llmSettings}
+          currentSceneSummary={currentSceneSummary}
+          currentSceneSummaryWordCount={currentSceneSummaryWordCount}
+          priorSceneSummaries={priorSceneSummaries}
+          allSceneSummaries={allSceneSummaries}
+          onOpenSceneSummary={onOpenSceneSummary}
         />
       </div>
 

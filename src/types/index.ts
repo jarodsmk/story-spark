@@ -73,6 +73,16 @@ export interface SceneDocument {
   synopsis?: string;
 }
 
+export interface SceneSummary {
+  filePath: string;
+  title: string;
+  summary: string;
+  keyEvents?: string[];
+  keyCharacters?: string[];
+  wordCount?: number;
+  updatedAt: number;
+}
+
 export interface Novel {
   id: string;
   title: string;
@@ -104,5 +114,28 @@ export interface GenerateContentRequest {
   systemPrompt?: string;
   selectedText?: string;
   surroundingContext?: string;
+  sceneSummaries?: Array<{ title: string; summary: string }>;
   temperature?: number;
+}
+
+export interface StorySuggestion {
+  id: string;
+  title: string;
+  type: 'plot_twist' | 'character_conflict' | 'lore_revelation' | 'subplot' | 'scene_beat' | 'general';
+  involvedCharacters: string[];
+  involvedLore: string[];
+  premise: string;
+  dramaticConflict: string;
+  suggestedSceneHook: string;
+}
+
+export interface GenerateStorySuggestionsRequest {
+  focusType?: 'all' | 'plot_twist' | 'character_conflict' | 'lore_revelation' | 'subplot' | 'scene_beat' | 'general';
+  customGuidance?: string;
+  characters?: Array<{ name: string; role?: string; summary?: string }>;
+  lore?: Array<{ name: string; category?: string; summary?: string }>;
+  selectedSceneSummaries?: Array<{ title: string; summary: string }>;
+  currentSceneTitle?: string;
+  surroundingContext?: string;
+  count?: number;
 }

@@ -51,6 +51,11 @@ interface SourcePaneProps {
   ) => Promise<LoreEntry>;
   onOpenFile?: (path: string) => void;
   llmSettings?: LLMSettings;
+  currentSceneSummary?: string;
+  currentSceneSummaryWordCount?: number;
+  priorSceneSummaries?: Array<{ title: string; summary: string }>;
+  allSceneSummaries?: Array<{ title: string; summary: string }>;
+  onOpenSceneSummary?: () => void;
 }
 
 export const SourcePane: React.FC<SourcePaneProps> = ({
@@ -74,6 +79,11 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
   onCreateLoreEntry,
   onOpenFile,
   llmSettings,
+  currentSceneSummary,
+  currentSceneSummaryWordCount,
+  priorSceneSummaries = [],
+  allSceneSummaries = [],
+  onOpenSceneSummary,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -478,6 +488,28 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
         </div>
 
         <div className="flex items-center space-x-2">
+          {onOpenSceneSummary && (
+            <button
+              id="source-pane-summarize-scene-btn"
+              type="button"
+              onClick={onOpenSceneSummary}
+              title={
+                currentSceneSummary
+                  ? `Scene Summary (${currentSceneSummaryWordCount || 'active'} words) - Click to view/edit`
+                  : 'Generate Scene Summary for LLM Context'
+              }
+              className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded transition border ${
+                currentSceneSummary
+                  ? 'bg-amber-950/50 text-amber-300 border-amber-800/60 hover:bg-amber-900/60'
+                  : 'text-stone-400 hover:text-stone-200 bg-stone-800/80 hover:bg-stone-800 border-stone-700/50'
+              }`}
+            >
+              <Sparkles className="w-3 h-3 text-amber-400" />
+              <span className="hidden sm:inline">
+                {currentSceneSummary ? 'Summary' : 'Summarize'}
+              </span>
+            </button>
+          )}
           <div className="text-xs text-stone-400 bg-stone-800/80 px-2 py-0.5 rounded font-mono">
             {wordCount} words
           </div>
@@ -711,6 +743,12 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
         surroundingContext={content}
         activeFileName={title}
         llmSettings={llmSettings}
+        priorSceneSummaries={priorSceneSummaries}
+        currentSceneSummary={currentSceneSummary}
+        allSceneSummaries={allSceneSummaries}
+        loreCharacters={loreCharacters}
+        loreWorld={loreWorld}
+        loreEntries={loreEntries}
         onInsertContent={handleInsertGeneratedContent}
       />
     </div>

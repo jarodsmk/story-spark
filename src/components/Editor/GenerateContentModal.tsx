@@ -14,9 +14,13 @@ import {
   Cpu,
   ChevronDown,
   ChevronUp,
+  Layers,
+  Lightbulb,
 } from 'lucide-react';
 import { LLMSettings } from '../../types/index.ts';
+import { LoreEntry } from '../../engine/lore/loreReference.ts';
 import { generateManuscriptContent, GenerateContentResult } from '../../engine/ai/index.ts';
+import { StorySuggestionsTab } from './StorySuggestionsTab.tsx';
 
 interface GenerateContentModalProps {
   isOpen: boolean;
@@ -27,6 +31,12 @@ interface GenerateContentModalProps {
   surroundingContext?: string;
   activeFileName?: string;
   llmSettings?: LLMSettings;
+  priorSceneSummaries?: Array<{ title: string; summary: string; filePath?: string }>;
+  currentSceneSummary?: string;
+  allSceneSummaries?: Array<{ title: string; summary: string; filePath?: string }>;
+  loreCharacters?: LoreEntry[];
+  loreWorld?: LoreEntry[];
+  loreEntries?: LoreEntry[];
   onInsertContent: (text: string, mode: 'replace-or-cursor' | 'append') => void;
 }
 
@@ -100,8 +110,15 @@ export const GenerateContentModal: React.FC<GenerateContentModalProps> = ({
   surroundingContext = '',
   activeFileName = '',
   llmSettings,
+  priorSceneSummaries = [],
+  currentSceneSummary = '',
+  allSceneSummaries = [],
+  loreCharacters = [],
+  loreWorld = [],
+  loreEntries = [],
   onInsertContent,
 }) => {
+  const [activeTab, setActiveTab] = useState<'prose' | 'suggestions'>('prose');
   const [prompt, setPrompt] = useState('');
   const [lengthMode, setLengthMode] = useState<'brief' | 'standard' | 'extended' | 'custom'>('standard');
   const [customWordCount, setCustomWordCount] = useState<number>(200);
@@ -110,10 +127,21 @@ export const GenerateContentModal: React.FC<GenerateContentModalProps> = ({
   const [systemPrompt, setSystemPrompt] = useState<string>(DEFAULT_SYSTEM_PROMPT);
   const [showSystemPrompt, setShowSystemPrompt] = useState<boolean>(false);
 
+  // Scene Summaries Context state
+  const [includeSceneSummaries, setIncludeSceneSummaries] = useState<boolean>(true);
+  const [summaryScope, setSummaryScope] = useState<'prior' | 'current' | 'all'>('prior');
+  const [showSummariesPreview, setShowSummariesPreview] = useState<boolean>(false);
+
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<GenerateContentResult | null>(null);
   const [copied, setCopied] = useState<boolean>(false);
+
+  // Handle using a brainstormed story idea directly inside the prose generator
+  const handleUseIdeaInGenerator = (promptGuidance: string) => {
+    setPrompt(promptGuidance);
+    setActiveTab('prose');
+  };
 
   // Initialize or reset state when opening
   useEffect(() => {
@@ -121,6 +149,15 @@ export const GenerateContentModal: React.FC<GenerateContentModalProps> = ({
       setError(null);
       setCopied(false);
       setResult(null);
+
+      // Default scope to prior if prior summaries exist, else current/all
+      if (priorSceneSummaries && priorSceneSummaries.length > 0) {
+        setSummaryScope('prior');
+      } else if (currentSceneSummary) {
+        setSummaryScope('current');
+      } else {
+        setSummaryScope('all');
+      }
 
       // Automatically include the system prompt, incorporating user settings if present
       const initialSystemPrompt =
@@ -157,6 +194,30 @@ export const GenerateContentModal: React.FC<GenerateContentModalProps> = ({
     selectedText.trim().length > 0 &&
     selectedText !== 'Selected Passage';
 
+  const hasAnySummaries =
+    Boolean((priorSceneSummaries && priorSceneSummaries.length > 0) ||
+    currentSceneSummary ||
+    (allSceneSummaries && allSceneSummaries.length > 0));
+
+  const getActiveSummaries = () => {
+    if (!includeSceneSummaries || !hasAnySummaries) return [];
+    if (summaryScope === 'prior') {
+      return (priorSceneSummaries && priorSceneSummaries.length > 0)
+        ? priorSceneSummaries
+        : currentSceneSummary
+        ? [{ title: activeFileName || 'Current Scene', summary: currentSceneSummary }]
+        : allSceneSummaries || [];
+    }
+    if (summaryScope === 'current') {
+      return currentSceneSummary
+        ? [{ title: activeFileName || 'Current Scene', summary: currentSceneSummary }]
+        : [];
+    }
+    return allSceneSummaries || [];
+  };
+
+  const activeSummaries = getActiveSummaries();
+
   const handleGenerate = async () => {
     if (!prompt.trim()) {
       setError('Please describe what you want the AI to generate.');
@@ -178,6 +239,7 @@ export const GenerateContentModal: React.FC<GenerateContentModalProps> = ({
           systemPrompt: systemPrompt.trim(),
           selectedText: hasSelection ? selectedText : undefined,
           surroundingContext,
+          sceneSummaries: activeSummaries.length > 0 ? activeSummaries : undefined,
         },
         llmSettings
       );
@@ -220,48 +282,98 @@ export const GenerateContentModal: React.FC<GenerateContentModalProps> = ({
     >
       <div className="bg-stone-900 border border-stone-700/80 shadow-2xl rounded-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden text-stone-200 animate-in zoom-in-95 duration-150">
         {/* Header */}
-        <div className="px-5 py-3.5 border-b border-stone-800 bg-stone-950/60 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
-              <Sparkles className="w-4 h-4" />
+        <div className="px-5 py-3 border-b border-stone-800 bg-stone-950/60 flex flex-col gap-2.5 flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                {activeTab === 'prose' ? <Sparkles className="w-4 h-4" /> : <Lightbulb className="w-4 h-4" />}
+              </div>
+              <div>
+                <h2 id="generate-modal-title" className="text-sm font-semibold text-stone-100 flex items-center gap-2">
+                  <span>{activeTab === 'prose' ? 'Generate Content' : 'Story Suggestions & Ideas'}</span>
+                  <span className="text-[11px] font-normal text-amber-400/90 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/30 font-mono">
+                    {connectedModel}
+                  </span>
+                </h2>
+                <p className="text-[11px] text-stone-400">
+                  {activeFileName ? `Active Scene: ${activeFileName}` : 'Draft prose or brainstorm narrative trajectories'}
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 id="generate-modal-title" className="text-sm font-semibold text-stone-100 flex items-center gap-2">
-                <span>Generate Content</span>
-                <span className="text-[11px] font-normal text-amber-400/90 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/30 font-mono">
-                  {connectedModel}
-                </span>
-              </h2>
-              <p className="text-[11px] text-stone-400">
-                {activeFileName ? `Generating for: ${activeFileName}` : 'Draft new narrative prose with connected LLM'}
-              </p>
-            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close dialog"
+              className="text-stone-400 hover:text-stone-200 p-1 rounded-md hover:bg-stone-800 transition cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close dialog"
-            className="text-stone-400 hover:text-stone-200 p-1 rounded-md hover:bg-stone-800 transition"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          {/* Tab Switcher: Draft Prose vs. Story Suggestions */}
+          <div className="flex items-center gap-1 p-0.5 bg-stone-900 border border-stone-800 rounded-lg select-none">
+            <button
+              id="generate-tab-prose-btn"
+              type="button"
+              onClick={() => setActiveTab('prose')}
+              className={`flex-1 py-1 px-3 rounded-md text-xs font-medium flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                activeTab === 'prose'
+                  ? 'bg-stone-800 text-amber-300 shadow-sm border border-stone-700/80'
+                  : 'text-stone-400 hover:text-stone-200 hover:bg-stone-850'
+              }`}
+            >
+              <Feather className="w-3.5 h-3.5" />
+              <span>Draft Prose</span>
+            </button>
+
+            <button
+              id="generate-tab-suggestions-btn"
+              type="button"
+              onClick={() => setActiveTab('suggestions')}
+              className={`flex-1 py-1 px-3 rounded-md text-xs font-medium flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                activeTab === 'suggestions'
+                  ? 'bg-stone-800 text-amber-300 shadow-sm border border-stone-700/80'
+                  : 'text-stone-400 hover:text-stone-200 hover:bg-stone-850'
+              }`}
+            >
+              <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
+              <span>Story Suggestions</span>
+              <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded-full font-mono">
+                Ideas
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* Scrollable Content Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {/* Active selection context note if right-clicked with selection */}
-          {hasSelection && (
-            <div className="p-2.5 rounded-lg bg-stone-950/60 border border-stone-800 text-xs flex items-start gap-2">
-              <BookOpen className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
-              <div className="truncate">
-                <span className="text-stone-400 font-medium">Selected in scene: </span>
-                <span className="text-amber-200/90 font-mono italic">
-                  "{selectedText.length > 80 ? `${selectedText.slice(0, 80)}...` : selectedText}"
-                </span>
-              </div>
-            </div>
-          )}
+          {activeTab === 'suggestions' ? (
+            <StorySuggestionsTab
+              characters={loreCharacters}
+              lore={loreWorld}
+              allSceneSummaries={allSceneSummaries}
+              currentSceneTitle={activeFileName}
+              currentSceneSummary={currentSceneSummary}
+              surroundingContext={surroundingContext}
+              llmSettings={llmSettings}
+              onUseIdeaInGenerator={handleUseIdeaInGenerator}
+              onInsertContent={onInsertContent}
+            />
+          ) : (
+            <>
+              {/* Active selection context note if right-clicked with selection */}
+              {hasSelection && (
+                <div className="p-2.5 rounded-lg bg-stone-950/60 border border-stone-800 text-xs flex items-start gap-2">
+                  <BookOpen className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div className="truncate">
+                    <span className="text-stone-400 font-medium">Selected in scene: </span>
+                    <span className="text-amber-200/90 font-mono italic">
+                      "{selectedText.length > 80 ? `${selectedText.slice(0, 80)}...` : selectedText}"
+                    </span>
+                  </div>
+                </div>
+              )}
 
           {/* 1. Content Description Prompt */}
           <div>
@@ -430,7 +542,114 @@ export const GenerateContentModal: React.FC<GenerateContentModalProps> = ({
             )}
           </div>
 
-          {/* 4. Automatically Included System Prompt */}
+          {/* 4. Story Context & Scene Summaries for LLM Prompting */}
+          <div className="rounded-lg border border-stone-800/80 bg-stone-950/50 overflow-hidden">
+            <div className="p-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-amber-400" />
+                <div>
+                  <div className="text-xs font-semibold text-stone-200 flex items-center gap-2">
+                    <span>Story Context & Scene Summaries</span>
+                    {activeSummaries.length > 0 && includeSceneSummaries && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800/50 font-mono">
+                        {activeSummaries.length} {activeSummaries.length === 1 ? 'scene' : 'scenes'} included
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-stone-400">
+                    Provides chronological plot and character context to the LLM for narrative consistency.
+                  </div>
+                </div>
+              </div>
+
+              {hasAnySummaries && (
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={includeSceneSummaries}
+                    onChange={(e) => setIncludeSceneSummaries(e.target.checked)}
+                    className="rounded border-stone-700 bg-stone-800 text-amber-500 focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 accent-amber-500"
+                  />
+                  <span className="text-xs text-stone-300 font-medium">Include</span>
+                </label>
+              )}
+            </div>
+
+            {hasAnySummaries ? (
+              includeSceneSummaries && (
+                <div className="px-3.5 pb-3 pt-1 border-t border-stone-800/60 space-y-2.5 bg-stone-950/80">
+                  {/* Scope selector */}
+                  <div className="flex items-center gap-1.5 pt-1 flex-wrap">
+                    <span className="text-[11px] text-stone-400 mr-1">Context Scope:</span>
+                    <button
+                      type="button"
+                      onClick={() => setSummaryScope('prior')}
+                      className={`px-2.5 py-1 rounded text-[11px] font-medium transition ${
+                        summaryScope === 'prior'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60 border border-transparent'
+                      }`}
+                    >
+                      Preceding Scenes ({priorSceneSummaries?.length || 0})
+                    </button>
+                    {currentSceneSummary && (
+                      <button
+                        type="button"
+                        onClick={() => setSummaryScope('current')}
+                        className={`px-2.5 py-1 rounded text-[11px] font-medium transition ${
+                          summaryScope === 'current'
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                            : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60 border border-transparent'
+                        }`}
+                      >
+                        Current Scene Summary
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setSummaryScope('all')}
+                      className={`px-2.5 py-1 rounded text-[11px] font-medium transition ${
+                        summaryScope === 'all'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60 border border-transparent'
+                      }`}
+                    >
+                      All Novel Scenes ({allSceneSummaries?.length || 0})
+                    </button>
+                  </div>
+
+                  {/* Collapsible preview of the summaries being sent */}
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setShowSummariesPreview(!showSummariesPreview)}
+                      className="text-[10px] text-amber-400/90 hover:text-amber-300 flex items-center gap-1"
+                    >
+                      <span>{showSummariesPreview ? 'Hide context preview' : 'Preview included scene summaries'}</span>
+                      {showSummariesPreview ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    </button>
+
+                    {showSummariesPreview && (
+                      <div className="mt-1.5 max-h-36 overflow-y-auto space-y-1.5 p-2 rounded bg-stone-900/90 border border-stone-800 text-[11px]">
+                        {activeSummaries.map((s, idx) => (
+                          <div key={idx} className="border-b border-stone-800/60 pb-1.5 last:border-0 last:pb-0">
+                            <span className="font-semibold text-amber-300/90 mr-1.5">[{s.title}]:</span>
+                            <span className="text-stone-300 leading-relaxed">{s.summary}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            ) : (
+              <div className="px-3.5 pb-3 text-[11px] text-stone-500 italic">
+                No scene summaries generated yet. Generate summaries for your scenes to give the LLM memory of earlier chapters.
+              </div>
+            )}
+          </div>
+
+          {/* 5. Automatically Included System Prompt */}
           <div className="rounded-lg border border-stone-800/80 bg-stone-950/50 overflow-hidden">
             <button
               type="button"
@@ -564,6 +783,8 @@ export const GenerateContentModal: React.FC<GenerateContentModalProps> = ({
               </div>
             </div>
           )}
+          </>
+          )}
         </div>
 
         {/* Footer Actions */}
@@ -576,29 +797,40 @@ export const GenerateContentModal: React.FC<GenerateContentModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-3.5 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg text-xs font-medium transition"
+              className="px-3.5 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg text-xs font-medium transition cursor-pointer"
             >
-              Cancel
+              {activeTab === 'suggestions' ? 'Close' : 'Cancel'}
             </button>
 
-            <button
-              type="button"
-              onClick={handleGenerate}
-              disabled={isGenerating || !prompt.trim()}
-              className="px-4 py-1.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 disabled:from-stone-800 disabled:to-stone-800 disabled:text-stone-500 text-stone-950 font-semibold rounded-lg text-xs flex items-center gap-2 shadow-md hover:shadow-amber-500/20 transition cursor-pointer disabled:cursor-not-allowed"
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Generating...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Generate with AI</span>
-                </>
-              )}
-            </button>
+            {activeTab === 'suggestions' ? (
+              <button
+                type="button"
+                onClick={() => setActiveTab('prose')}
+                className="px-3.5 py-1.5 bg-stone-850 hover:bg-stone-800 text-amber-300 border border-stone-700 hover:border-amber-500/50 rounded-lg text-xs font-medium transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <Feather className="w-3.5 h-3.5" />
+                <span>Go to Draft Prose</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleGenerate}
+                disabled={isGenerating || !prompt.trim()}
+                className="px-4 py-1.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 disabled:from-stone-800 disabled:to-stone-800 disabled:text-stone-500 text-stone-950 font-semibold rounded-lg text-xs flex items-center gap-2 shadow-md hover:shadow-amber-500/20 transition cursor-pointer disabled:cursor-not-allowed"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Generating...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Generate with AI</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>

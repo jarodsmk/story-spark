@@ -1,4 +1,9 @@
-import { LLMSettings, Suggestion } from '../../types/index.ts';
+import {
+  LLMSettings,
+  Suggestion,
+  StorySuggestion,
+  GenerateStorySuggestionsRequest,
+} from '../../types/index.ts';
 
 export interface RewriteResult {
   rewrittenText: string;
@@ -173,6 +178,7 @@ export interface GenerateContentOptions {
   systemPrompt?: string;
   selectedText?: string;
   surroundingContext?: string;
+  sceneSummaries?: Array<{ title: string; summary: string }>;
   temperature?: number;
 }
 
@@ -180,6 +186,18 @@ export interface GenerateContentResult {
   generatedText: string;
   prompt: string;
   wordCount: number;
+}
+
+export interface SummarizeSceneOptions {
+  sceneContent: string;
+  sceneTitle?: string;
+  instructions?: string;
+}
+
+export interface SummarizeSceneResult {
+  summary: string;
+  wordCount: number;
+  sceneTitle: string;
 }
 
 /**
@@ -216,6 +234,7 @@ export async function generateManuscriptContent(
         systemPrompt: options.systemPrompt || settings?.systemPrompt,
         selectedText: options.selectedText,
         surroundingContext: options.surroundingContext,
+        sceneSummaries: options.sceneSummaries,
         temperature: options.temperature ?? 0.75,
       }),
     });
@@ -288,6 +307,16 @@ export async function generateManuscriptContent(
 
   let userMessage = `Content Description / Instructions:\n${options.prompt.trim()}\n\n${lengthGuidance}\n${styleGuidance}`;
 
+  if (Array.isArray(options.sceneSummaries) && options.sceneSummaries.length > 0) {
+    const formatted = options.sceneSummaries
+      .filter(s => s && s.summary && s.summary.trim())
+      .map((s, idx) => `[Scene ${idx + 1}: ${s.title || 'Untitled'}]\n${s.summary.trim()}`)
+      .join('\n\n');
+    if (formatted) {
+      userMessage += `\n\nNovel Scene Summaries (Chronological Story Context):\n"""\n${formatted}\n"""`;
+    }
+  }
+
   if (options.selectedText && options.selectedText.trim()) {
     userMessage += `\n\nReference / Selected Passage in Scene:\n"""\n${options.selectedText.trim()}\n"""`;
   }
@@ -354,4 +383,254 @@ export async function generateManuscriptContent(
     }
     throw error;
   }
+}
+
+/**
+ * Generates a concise narrative summary of a scene using the connected LLM.
+ * Defaults to the server-side Gemini endpoint (`/api/ai/summarize-scene`).
+ */
+export async function summarizeSceneContent(
+  options: SummarizeSceneOptions,
+  settings?: LLMSettings
+): Promise<SummarizeSceneResult> {
+  if (!options.sceneContent || !options.sceneContent.trim()) {
+    throw new Error('Scene has no text to summarize.');
+  }
+
+  const isCustomEndpoint =
+    settings &&
+    settings.baseUrl &&
+    settings.baseUrl.trim() !== '' &&
+    !settings.baseUrl.includes('openrouter.ai');
+
+  if (!isCustomEndpoint) {
+    const response = await fetch('/api/ai/summarize-scene', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        sceneContent: options.sceneContent,
+        sceneTitle: options.sceneTitle,
+        instructions: options.instructions,
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || `Scene summarization failed (${response.status})`);
+    }
+
+    return await response.json();
+  }
+
+  // Custom BYOM path
+  const baseUrl = (settings.baseUrl || '').replace(/\/+$/, '');
+  const url = `${baseUrl}/chat/completions`;
+
+  const systemInstruction =
+    'You are an expert fiction novelist, story editor, and manuscript analyst. ' +
+    'Generate a concise, information-dense summary of the provided fiction scene (approximately 60 to 120 words). ' +
+    'Focus strictly on: ' +
+    '1. Key plot developments and revelations that occurred in this scene. ' +
+    '2. Main characters present, their core motivations, interactions, and emotional shifts. ' +
+    '3. The immediate ending state, unresolved conflicts, or narrative hook setting up subsequent scenes. ' +
+    'Do NOT include any meta-commentary, introductory remarks ("In this scene..."), bullet formatting, or conversational tone. ' +
+    'Output ONLY the single, cohesive narrative summary paragraph, crafted specifically to serve as background context for AI story continuation and plotting.';
+
+  let promptText = `Scene Title: ${options.sceneTitle || 'Untitled Scene'}\n\n`;
+  if (options.instructions) {
+    promptText += `Specific Instructions: ${options.instructions}\n\n`;
+  }
+  promptText += `Scene Content to Summarize:\n"""\n${options.sceneContent.trim()}\n"""`;
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (settings.apiKey) {
+    headers['Authorization'] = `Bearer ${settings.apiKey}`;
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model: settings.model || 'microsoft/wizardlm-2-8x22b',
+      messages: [
+        { role: 'system', content: systemInstruction },
+        { role: 'user', content: promptText },
+      ],
+      temperature: 0.3,
+    }),
+  });
+
+  if (!response.ok) {
+    const errBody = await response.text().catch(() => '');
+    throw new Error(`Custom LLM returned error (${response.status}): ${errBody || response.statusText}`);
+  }
+
+  const data = await response.json();
+  let summary = data.choices?.[0]?.message?.content?.trim() || '';
+
+  if (summary.startsWith('"""') && summary.endsWith('"""')) {
+    summary = summary.slice(3, -3).trim();
+  } else if (summary.startsWith('```markdown') && summary.endsWith('```')) {
+    summary = summary.slice(11, -3).trim();
+  } else if (summary.startsWith('```') && summary.endsWith('```')) {
+    summary = summary.slice(3, -3).trim();
+  }
+
+  const wordCount = summary.split(/\s+/).filter(w => w.length > 0).length;
+
+  return {
+    summary,
+    wordCount,
+    sceneTitle: options.sceneTitle || 'Untitled Scene',
+  };
+}
+
+/**
+ * Generate brainstormed story suggestions using characters, lore, and selectable scene summaries
+ */
+export async function generateStorySuggestions(
+  options: GenerateStorySuggestionsRequest,
+  settings?: LLMSettings
+): Promise<{ suggestions: StorySuggestion[] }> {
+  const isCustomEndpoint =
+    settings &&
+    settings.baseUrl &&
+    settings.baseUrl.trim() !== '' &&
+    !settings.baseUrl.includes('openrouter.ai');
+
+  if (!isCustomEndpoint) {
+    const response = await fetch('/api/ai/story-suggestions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(options),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || `Story suggestions generation failed with status ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  // Custom BYOM endpoint fallback
+  const baseUrl = (settings.baseUrl || '').replace(/\/+$/, '');
+  const url = `${baseUrl}/chat/completions`;
+
+  const systemInstruction =
+    'You are a world-class fiction story consultant and narrative architect. ' +
+    'Provide creative story suggestions grounded in the provided scene summaries, characters, and lore. ' +
+    'Output MUST be valid JSON with a "suggestions" array.';
+
+  let prompt = `Current Working Scene: ${options.currentSceneTitle || 'Untitled Scene'}\n`;
+  if (options.focusType && options.focusType !== 'all') {
+    prompt += `Brainstorm Category Focus: ${options.focusType}\n`;
+  }
+  if (options.customGuidance?.trim()) {
+    prompt += `Author's Guidance: ${options.customGuidance.trim()}\n`;
+  }
+
+  if (options.characters && options.characters.length > 0) {
+    prompt += `\nExisting Characters:\n`;
+    options.characters.forEach((c) => {
+      prompt += `- ${c.name}${c.role ? ` (${c.role})` : ''}: ${c.summary || ''}\n`;
+    });
+  }
+
+  if (options.lore && options.lore.length > 0) {
+    prompt += `\nExisting Lore / World Elements:\n`;
+    options.lore.forEach((l) => {
+      prompt += `- ${l.name}${l.category ? ` [${l.category}]` : ''}: ${l.summary || ''}\n`;
+    });
+  }
+
+  if (options.selectedSceneSummaries && options.selectedSceneSummaries.length > 0) {
+    prompt += `\nTimeline Scene Summaries:\n"""\n`;
+    options.selectedSceneSummaries.forEach((s, idx) => {
+      prompt += `[Scene ${idx + 1}: ${s.title}]\n${s.summary}\n\n`;
+    });
+    prompt += `"""\n`;
+  }
+
+  prompt += `\nGenerate exactly ${options.count || 4} distinct story suggestions as JSON:\n` +
+    `{\n` +
+    `  "suggestions": [\n` +
+    `    {\n` +
+    `      "id": "sug_1",\n` +
+    `      "title": "Title",\n` +
+    `      "type": "plot_twist" | "character_conflict" | "lore_revelation" | "subplot" | "scene_beat",\n` +
+    `      "involvedCharacters": ["Name"],\n` +
+    `      "involvedLore": ["Lore item"],\n` +
+    `      "premise": "Vivid description",\n` +
+    `      "dramaticConflict": "Conflict and stakes",\n` +
+    `      "suggestedSceneHook": "Actionable hook to write"\n` +
+    `    }\n` +
+    `  ]\n` +
+    `}`;
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (settings.apiKey) {
+    headers['Authorization'] = `Bearer ${settings.apiKey}`;
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model: settings.model || 'microsoft/wizardlm-2-8x22b',
+      messages: [
+        { role: 'system', content: systemInstruction },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.8,
+    }),
+  });
+
+  if (!response.ok) {
+    const errBody = await response.text().catch(() => '');
+    throw new Error(`Custom LLM returned error (${response.status}): ${errBody || response.statusText}`);
+  }
+
+  const data = await response.json();
+  let rawContent = data.choices?.[0]?.message?.content?.trim() || '';
+  if (rawContent.startsWith('```json')) {
+    rawContent = rawContent.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
+  } else if (rawContent.startsWith('```')) {
+    rawContent = rawContent.replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+  }
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(rawContent);
+  } catch (err) {
+    const firstBrace = rawContent.indexOf('{');
+    const lastBrace = rawContent.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+      parsed = JSON.parse(rawContent.slice(firstBrace, lastBrace + 1));
+    } else {
+      throw new Error('Could not parse story suggestions from LLM.');
+    }
+  }
+
+  const suggestionsList = Array.isArray(parsed?.suggestions) ? parsed.suggestions : [];
+  return {
+    suggestions: suggestionsList.map((s: any, idx: number) => ({
+      id: s.id || `sug_${Date.now()}_${idx}`,
+      title: String(s.title || `Story Idea ${idx + 1}`).trim(),
+      type: s.type || 'general',
+      involvedCharacters: Array.isArray(s.involvedCharacters) ? s.involvedCharacters : [],
+      involvedLore: Array.isArray(s.involvedLore) ? s.involvedLore : [],
+      premise: String(s.premise || ''),
+      dramaticConflict: String(s.dramaticConflict || ''),
+      suggestedSceneHook: String(s.suggestedSceneHook || ''),
+    })),
+  };
 }
