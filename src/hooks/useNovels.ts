@@ -53,6 +53,7 @@ export function useNovels() {
     description?: string;
     targetWordCount?: number;
     template?: 'standard' | 'blank' | 'rich';
+    coverImage?: string;
   }): Promise<{ novel: Novel; initialScenePath: string }> => {
     const slug = sanitizeFilename(data.title.toLowerCase()) || 'novel';
     const uniqueId = `${slug}-${Date.now().toString(36)}`;
@@ -66,6 +67,7 @@ export function useNovels() {
       targetWordCount: data.targetWordCount || 50000,
       createdAt: now,
       updatedAt: now,
+      coverImage: data.coverImage,
     };
 
     const initialScenePath = `novels/${uniqueId}/scenes/01-chapter-1.md`;

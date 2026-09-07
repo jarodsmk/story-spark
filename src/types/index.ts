@@ -91,6 +91,7 @@ export interface Novel {
   targetWordCount?: number;
   createdAt: number;
   updatedAt: number;
+  coverImage?: string;
 }
 
 export interface LLMSettings {

@@ -3,6 +3,7 @@ import { fs } from '../../storage/fs.ts';
 import { ImportModal } from './ImportModal.tsx';
 import { ExportModal } from './ExportModal.tsx';
 import { NovelModal } from './NovelModal.tsx';
+import { CoverUploadModal } from './CoverUploadModal.tsx';
 import { Novel } from '../../types/index.ts';
 import { NovelCrafterParseResult } from '../../engine/novelcrafter/index.ts';
 import { NovelCrafterImportOptions, NovelCrafterImportSummary } from '../../engine/novelcrafter/importer.ts';
@@ -14,6 +15,11 @@ interface ModalsProps {
   setIsExportOpen: (v: boolean) => void;
   isNovelOpen: boolean;
   setIsNovelOpen: (v: boolean) => void;
+  isCoverUploadOpen?: boolean;
+  setIsCoverUploadOpen?: (v: boolean) => void;
+  coverUploadNovel?: Novel | null;
+  onOpenCoverUpload?: (novel: Novel) => void;
+  onSaveCover?: (novelId: string, coverDataUrl: string | undefined) => Promise<void>;
   compiledPreview: string;
   createScene: (title: string) => Promise<string>;
   createBibleEntry: (name: string, type: 'character' | 'world') => Promise<string>;
@@ -29,6 +35,7 @@ interface ModalsProps {
     description?: string;
     targetWordCount?: number;
     template?: 'standard' | 'blank' | 'rich';
+    coverImage?: string;
   }) => Promise<{ novel: Novel; initialScenePath: string }>;
   onUpdateNovel: (id: string, updates: Partial<Omit<Novel, 'id' | 'createdAt'>>) => Promise<void>;
   onDeleteNovel: (id: string) => Promise<string>;
@@ -48,6 +55,11 @@ export const ModalsContainer: React.FC<ModalsProps> = ({
   setIsExportOpen,
   isNovelOpen,
   setIsNovelOpen,
+  isCoverUploadOpen = false,
+  setIsCoverUploadOpen,
+  coverUploadNovel = null,
+  onOpenCoverUpload,
+  onSaveCover,
   compiledPreview,
   createScene,
   createBibleEntry,
@@ -120,6 +132,20 @@ export const ModalsContainer: React.FC<ModalsProps> = ({
         onExecuteImportNovelCrafter={handleNovelCrafterImport}
         onOpenScene={handleOpenSceneAfterImport}
         activeWordCount={activeWordCount}
+        onOpenCoverUpload={onOpenCoverUpload}
+      />
+
+      <CoverUploadModal
+        isOpen={isCoverUploadOpen}
+        onClose={() => setIsCoverUploadOpen?.(false)}
+        novel={coverUploadNovel || activeNovel || null}
+        onSaveCover={async (novelId, coverDataUrl) => {
+          if (onSaveCover) {
+            await onSaveCover(novelId, coverDataUrl);
+          } else {
+            await onUpdateNovel(novelId, { coverImage: coverDataUrl });
+          }
+        }}
       />
     </>
   );

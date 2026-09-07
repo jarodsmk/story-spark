@@ -13,6 +13,8 @@ import {
   Check,
   BookOpen,
   Sparkles,
+  Image as ImageIcon,
+  Camera,
 } from 'lucide-react';
 import { FileItem } from '../../storage/fs.ts';
 import { Novel, SceneSummary } from '../../types/index.ts';
@@ -32,6 +34,7 @@ interface SidebarProps {
   activeNovel?: Novel;
   onSelectNovel?: (id: string) => void;
   onOpenNovelManager?: () => void;
+  onUploadCover?: (novel: Novel) => void;
   summaries?: Record<string, SceneSummary>;
   onOpenSceneSummaries?: (scenePath?: string) => void;
 }
@@ -51,6 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeNovel,
   onSelectNovel,
   onOpenNovelManager,
+  onUploadCover,
   summaries = {},
   onOpenSceneSummaries,
 }) => {
@@ -100,31 +104,81 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Novel Selector Banner */}
       {activeNovel && (
         <div className="p-2 border-b border-stone-800/80 relative" ref={dropdownRef}>
-          <div className="text-[9px] uppercase tracking-wider text-stone-500 font-semibold px-1 mb-1 flex items-center justify-between">
+          <div className="text-[9px] uppercase tracking-wider text-stone-500 font-semibold px-1 mb-1.5 flex items-center justify-between">
             <span>Active Novel</span>
-            <span className="font-mono text-[9px] text-amber-500/80">{novels.length} total</span>
+            <div className="flex items-center gap-1.5">
+              {onUploadCover && (
+                <button
+                  type="button"
+                  id="sidebar-upload-cover-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUploadCover(activeNovel);
+                  }}
+                  title={activeNovel.coverImage ? 'Change Cover Art' : 'Upload Cover Art'}
+                  className="text-[9px] text-amber-500 hover:text-amber-400 font-medium flex items-center gap-0.5 hover:underline"
+                >
+                  <ImageIcon className="w-2.5 h-2.5" />
+                  <span>{activeNovel.coverImage ? 'Cover' : '+ Cover'}</span>
+                </button>
+              )}
+              <span className="font-mono text-[9px] text-stone-600">·</span>
+              <span className="font-mono text-[9px] text-amber-500/80">{novels.length} total</span>
+            </div>
           </div>
 
-          <button
-            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="w-full text-left bg-stone-900 hover:bg-stone-800/90 border border-stone-800 hover:border-stone-700 p-2 rounded transition-colors flex items-center justify-between gap-2"
-          >
-            <div className="min-w-0 flex-1">
-              <div className="font-semibold text-stone-100 truncate text-[11px] leading-tight">
-                {activeNovel.title}
-              </div>
-              {activeNovel.genre && (
-                <div className="text-[9px] text-amber-400/80 truncate mt-0.5 font-medium">
-                  {activeNovel.genre}
+          <div className="flex items-center gap-2">
+            {/* Book Cover Thumbnail with Quick Upload Overlay */}
+            <button
+              type="button"
+              id="sidebar-novel-cover-thumbnail"
+              onClick={() => onUploadCover?.(activeNovel)}
+              title={activeNovel.coverImage ? 'Click to change cover picture' : 'Click to upload cover picture'}
+              className="relative group flex-shrink-0 w-8 h-11 rounded bg-stone-950 border border-stone-700/80 overflow-hidden shadow-sm hover:border-amber-500 transition-all cursor-pointer text-left"
+            >
+              {activeNovel.coverImage ? (
+                <>
+                  <img
+                    src={activeNovel.coverImage}
+                    alt={`${activeNovel.title} cover`}
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-amber-400">
+                    <Camera className="w-3.5 h-3.5" />
+                  </div>
+                </>
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-stone-900 via-stone-950 to-stone-900 text-stone-600 group-hover:text-amber-400 transition-colors p-0.5">
+                  <BookOpen className="w-3.5 h-3.5 mb-0.5" />
+                  <span className="text-[7px] font-mono leading-none tracking-tight opacity-75">+Art</span>
                 </div>
               )}
-            </div>
-            <ChevronDown
-              className={`w-3.5 h-3.5 text-stone-400 flex-shrink-0 transition-transform ${
-                isDropdownOpen ? 'rotate-180 text-amber-500' : ''
-              }`}
-            />
-          </button>
+            </button>
+
+            {/* Novel Switcher Dropdown Trigger */}
+            <button
+              id="sidebar-novel-dropdown-btn"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="flex-1 min-w-0 text-left bg-stone-900 hover:bg-stone-800/90 border border-stone-800 hover:border-stone-700 p-1.5 rounded transition-colors flex items-center justify-between gap-1.5"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold text-stone-100 truncate text-[11px] leading-tight">
+                  {activeNovel.title}
+                </div>
+                {activeNovel.genre && (
+                  <div className="text-[9px] text-amber-400/80 truncate mt-0.5 font-medium">
+                    {activeNovel.genre}
+                  </div>
+                )}
+              </div>
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-stone-400 flex-shrink-0 transition-transform ${
+                  isDropdownOpen ? 'rotate-180 text-amber-500' : ''
+                }`}
+              />
+            </button>
+          </div>
 
           {/* Novel Switcher Dropdown */}
           {isDropdownOpen && (
@@ -139,15 +193,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         onSelectNovel?.(n.id);
                         setIsDropdownOpen(false);
                       }}
-                      className={`w-full text-left px-2.5 py-1.5 flex items-center justify-between transition-colors ${
+                      className={`w-full text-left px-2 py-1.5 flex items-center justify-between gap-2 transition-colors ${
                         isSelected
                           ? 'bg-amber-950/40 text-amber-300 font-medium'
                           : 'text-stone-300 hover:bg-stone-800 hover:text-stone-100'
                       }`}
                     >
-                      <div className="truncate pr-2">
-                        <div className="truncate text-[11px]">{n.title}</div>
-                        {n.genre && <div className="text-[9px] text-stone-500 truncate">{n.genre}</div>}
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className="w-5 h-7 rounded-sm bg-stone-950 border border-stone-800 flex-shrink-0 overflow-hidden flex items-center justify-center shadow-xs">
+                          {n.coverImage ? (
+                            <img
+                              src={n.coverImage}
+                              alt=""
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <BookOpen className="w-2.5 h-2.5 text-stone-600" />
+                          )}
+                        </div>
+                        <div className="truncate flex-1">
+                          <div className="truncate text-[11px] leading-tight">{n.title}</div>
+                          {n.genre && <div className="text-[9px] text-stone-500 truncate">{n.genre}</div>}
+                        </div>
                       </div>
                       {isSelected && <Check className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />}
                     </button>

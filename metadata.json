@@ -1,6 +1,6 @@
 {
   "name": "StorySpark",
-  "description": "Personal author studio for writing, revision suggestions, and manuscript management",
+  "description": "Personal author studio for writing, revision suggestions, manuscript management, and novel cover art customization",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

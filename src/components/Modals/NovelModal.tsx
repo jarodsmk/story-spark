@@ -13,11 +13,14 @@ import {
   AlertTriangle,
   Library,
   FileArchive,
+  Image as ImageIcon,
+  Camera,
 } from 'lucide-react';
 import { Novel } from '../../types/index.ts';
 import { NovelCrafterParseResult } from '../../engine/novelcrafter/index.ts';
 import { NovelCrafterImportOptions, NovelCrafterImportSummary } from '../../engine/novelcrafter/importer.ts';
 import { NovelCrafterImportView } from './NovelCrafterImportView.tsx';
+import { CoverImageInput } from '../Common/CoverImageInput.tsx';
 
 interface NovelModalProps {
   isOpen: boolean;
@@ -31,6 +34,7 @@ interface NovelModalProps {
     description?: string;
     targetWordCount?: number;
     template?: 'standard' | 'blank' | 'rich';
+    coverImage?: string;
   }) => Promise<{ novel: Novel; initialScenePath: string }>;
   onUpdateNovel: (id: string, updates: Partial<Omit<Novel, 'id' | 'createdAt'>>) => Promise<void>;
   onDeleteNovel: (id: string) => Promise<string>;
@@ -41,6 +45,7 @@ interface NovelModalProps {
   ) => Promise<{ novel: Novel; firstScenePath: string; summary: NovelCrafterImportSummary }>;
   onOpenScene: (scenePath: string) => Promise<void>;
   activeWordCount?: number;
+  onOpenCoverUpload?: (novel: Novel) => void;
 }
 
 const GENRE_OPTIONS = [
@@ -72,6 +77,7 @@ export const NovelModal: React.FC<NovelModalProps> = ({
   onExecuteImportNovelCrafter,
   onOpenScene,
   activeWordCount = 0,
+  onOpenCoverUpload,
 }) => {
   const [activeTab, setActiveTab] = useState<'list' | 'create' | 'edit' | 'import'>('list');
   const [editingNovelId, setEditingNovelId] = useState<string | null>(null);
@@ -87,6 +93,7 @@ export const NovelModal: React.FC<NovelModalProps> = ({
   const [newDescription, setNewDescription] = useState('');
   const [newTargetWords, setNewTargetWords] = useState(50000);
   const [newTemplate, setNewTemplate] = useState<'standard' | 'blank' | 'rich'>('standard');
+  const [newCoverImage, setNewCoverImage] = useState<string | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form states for Edit Novel
@@ -94,6 +101,7 @@ export const NovelModal: React.FC<NovelModalProps> = ({
   const [editGenre, setEditGenre] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editTargetWords, setEditTargetWords] = useState(50000);
+  const [editCoverImage, setEditCoverImage] = useState<string | undefined>(undefined);
 
   if (!isOpen) return null;
 
@@ -103,6 +111,7 @@ export const NovelModal: React.FC<NovelModalProps> = ({
     setEditGenre(novel.genre || 'General Fiction');
     setEditDescription(novel.description || '');
     setEditTargetWords(novel.targetWordCount || 50000);
+    setEditCoverImage(novel.coverImage);
     setActiveTab('edit');
   };
 
@@ -116,6 +125,7 @@ export const NovelModal: React.FC<NovelModalProps> = ({
         genre: editGenre.trim(),
         description: editDescription.trim(),
         targetWordCount: editTargetWords,
+        coverImage: editCoverImage,
       });
       setActiveTab('list');
       setEditingNovelId(null);
@@ -136,11 +146,13 @@ export const NovelModal: React.FC<NovelModalProps> = ({
         description: newDescription.trim(),
         targetWordCount: newTargetWords,
         template: newTemplate,
+        coverImage: newCoverImage,
       });
       // Reset form
       setNewTitle('');
       setNewDescription('');
       setNewCustomGenre('');
+      setNewCoverImage(undefined);
       setActiveTab('list');
       onClose();
     } finally {
@@ -280,8 +292,40 @@ export const NovelModal: React.FC<NovelModalProps> = ({
                           : 'bg-stone-950/60 border-stone-800/80 hover:border-stone-700'
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="space-y-1 flex-1">
+                      <div className="flex items-start gap-3.5">
+                        {/* Book Cover Thumbnail with Quick Upload Trigger */}
+                        <div
+                          onClick={() => {
+                            if (onOpenCoverUpload) {
+                              onOpenCoverUpload(novel);
+                            } else {
+                              handleStartEdit(novel);
+                            }
+                          }}
+                          title="Click to upload or change cover picture"
+                          className="relative group w-12 aspect-[2/3] rounded bg-stone-950 border border-stone-800 hover:border-amber-500/80 flex-shrink-0 overflow-hidden shadow-sm cursor-pointer transition-all"
+                        >
+                          {novel.coverImage ? (
+                            <>
+                              <img
+                                src={novel.coverImage}
+                                alt={`${novel.title} cover`}
+                                className="w-full h-full object-cover"
+                                referrerPolicy="no-referrer"
+                              />
+                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-amber-400">
+                                <Camera className="w-3.5 h-3.5" />
+                              </div>
+                            </>
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center bg-stone-950 text-stone-600 group-hover:text-amber-400 transition-colors p-1">
+                              <BookOpen className="w-4 h-4 mb-0.5" />
+                              <span className="text-[7px] font-mono leading-tight text-center">+Cover</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-1 flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="font-semibold text-stone-100 text-sm">{novel.title}</h3>
                             {novel.genre && (
@@ -302,7 +346,7 @@ export const NovelModal: React.FC<NovelModalProps> = ({
                             </p>
                           )}
 
-                          <div className="flex items-center gap-4 text-stone-500 text-[10px] pt-1">
+                          <div className="flex items-center gap-4 text-stone-500 text-[10px] pt-1 flex-wrap">
                             <span className="flex items-center gap-1">
                               <Target className="w-3 h-3 text-stone-400" />
                               Target: {wordTarget.toLocaleString()} words
@@ -332,6 +376,20 @@ export const NovelModal: React.FC<NovelModalProps> = ({
                               Switch to Novel
                             </button>
                           )}
+
+                          <button
+                            title={novel.coverImage ? 'Change cover picture' : 'Upload cover picture'}
+                            onClick={() => {
+                              if (onOpenCoverUpload) {
+                                onOpenCoverUpload(novel);
+                              } else {
+                                handleStartEdit(novel);
+                              }
+                            }}
+                            className="p-1.5 text-stone-400 hover:text-amber-400 bg-stone-900 hover:bg-stone-800 rounded border border-stone-800 transition-colors"
+                          >
+                            <ImageIcon className="w-3.5 h-3.5" />
+                          </button>
 
                           <button
                             title="Edit novel details"
@@ -460,6 +518,14 @@ export const NovelModal: React.FC<NovelModalProps> = ({
               />
             </div>
 
+            {/* Cover Picture for New Novel */}
+            <CoverImageInput
+              value={newCoverImage}
+              onChange={setNewCoverImage}
+              novelTitle={newTitle || 'New Novel'}
+              label="Cover Picture (Optional)"
+            />
+
             <div>
               <label className="block text-stone-300 font-medium mb-2">Starter Template</label>
               <div className="grid grid-cols-3 gap-3">
@@ -576,6 +642,14 @@ export const NovelModal: React.FC<NovelModalProps> = ({
                 className="w-full bg-stone-950 border border-stone-800 rounded px-3 py-2 text-stone-200 focus:outline-none focus:border-amber-600 text-xs leading-relaxed"
               />
             </div>
+
+            {/* Cover Picture for Edit Novel */}
+            <CoverImageInput
+              value={editCoverImage}
+              onChange={setEditCoverImage}
+              novelTitle={editTitle || 'Untitled Novel'}
+              label="Cover Picture"
+            />
 
             <div className="pt-3 border-t border-stone-800 flex justify-end gap-2">
               <button

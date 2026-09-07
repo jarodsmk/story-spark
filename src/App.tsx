@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { fs } from './storage/fs.ts';
-import { Suggestion } from './types/index.ts';
+import { Suggestion, Novel } from './types/index.ts';
 import { runAllChecks } from './engine/checks/index.ts';
 import { rewritePassage, runAIEditorialPass } from './engine/ai/index.ts';
 import { applySuggestion, replacePassage, applyMultipleSuggestions } from './engine/diff/index.ts';
@@ -45,6 +45,13 @@ export function App() {
   const [isAnalyzingAI, setIsAnalyzingAI] = useState<boolean>(false);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [activeWordCount, setActiveWordCount] = useState<number>(0);
+  const [openCoverModal, setOpenCoverModal] = useState(false);
+  const [coverTargetNovel, setCoverTargetNovel] = useState<Novel | null>(null);
+
+  const handleOpenCoverUpload = (novel: Novel) => {
+    setCoverTargetNovel(novel);
+    setOpenCoverModal(true);
+  };
 
   const ms = useManuscriptActions(
     files.activeFileName,
@@ -257,6 +264,7 @@ export function App() {
         activeNovel={novelsState.activeNovel}
         onSelectNovel={novelsState.selectNovel}
         onOpenNovelManager={() => setOpenNovelManager(true)}
+        onUploadCover={handleOpenCoverUpload}
         summaries={sceneSummaries.summaries}
         onOpenSceneSummaries={(path) => {
           setSummaryModalTargetFile(path || files.activeFilePath);
@@ -337,6 +345,13 @@ export function App() {
         setIsExportOpen={ms.setIsExportOpen}
         isNovelOpen={openNovelManager}
         setIsNovelOpen={setOpenNovelManager}
+        isCoverUploadOpen={openCoverModal}
+        setIsCoverUploadOpen={setOpenCoverModal}
+        coverUploadNovel={coverTargetNovel}
+        onOpenCoverUpload={handleOpenCoverUpload}
+        onSaveCover={async (novelId, coverDataUrl) => {
+          await novelsState.updateNovel(novelId, { coverImage: coverDataUrl });
+        }}
         compiledPreview={ms.compiledPreview}
         createScene={files.createScene}
         createBibleEntry={files.createBibleEntry}
