@@ -98,6 +98,8 @@ export interface LLMSettings {
   baseUrl: string;
   model: string;
   systemPrompt: string;
+  provider?: string;
+  customModel?: string;
 }
 
 export interface RewriteRequest {

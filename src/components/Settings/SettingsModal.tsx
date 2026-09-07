@@ -39,8 +39,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-      <div className="bg-stone-900 border border-stone-800 rounded-lg w-full max-w-sm flex flex-col shadow-2xl text-xs">
-        <div className="h-10 border-b border-stone-800 px-3 flex items-center justify-between">
+      <div className="bg-stone-900 border border-stone-800 rounded-lg w-full max-w-lg flex flex-col shadow-2xl text-xs max-h-[90vh]">
+        <div className="h-10 border-b border-stone-800 px-3 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center space-x-1.5 font-medium text-stone-200">
             <Sliders className="w-3.5 h-3.5 text-amber-500" />
             <span>StorySpark Settings</span>
@@ -48,7 +48,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <button onClick={onClose} className="text-stone-400 hover:text-white"><X className="w-4 h-4" /></button>
         </div>
 
-        <div className="flex border-b border-stone-800 px-2 bg-stone-950/40">
+        <div className="flex border-b border-stone-800 px-2 bg-stone-950/40 flex-shrink-0">
           {(['rules', 'ai', 'terms'] as const).map(t => (
             <button
               key={t}
@@ -60,7 +60,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           ))}
         </div>
 
-        <div className="p-3">
+        <div className="p-4 overflow-y-auto">
           {tab === 'rules' && <RulesTab rules={rules} onToggle={handleToggle} />}
           {tab === 'ai' && <AITab settings={llmSettings} onSave={onSaveLLMSettings} />}
           {tab === 'terms' && <TermsTab terms={ignoredTerms} onAdd={onAddIgnoredTerm} onRemove={onRemoveIgnoredTerm} />}

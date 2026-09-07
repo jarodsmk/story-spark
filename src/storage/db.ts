@@ -1,4 +1,4 @@
-import { UserRule, IgnoredTerm, RecentDocument, Novel } from '../types/index.ts';
+import { UserRule, IgnoredTerm, RecentDocument, Novel, LLMSettings } from '../types/index.ts';
 import { DEFAULT_USER_RULES } from '../engine/checks/index.ts';
 
 // Web LocalStorage / In-memory DB interface that mirrors SQLite schema
@@ -186,15 +186,16 @@ export class LocalDatabase {
     await this.saveSetting(RECENTS_KEY, updated);
   }
 
-  async getLLMSettings(): Promise<{ apiKey: string; baseUrl: string; model: string; systemPrompt: string }> {
-    const defaults = {
+  async getLLMSettings(): Promise<LLMSettings> {
+    const defaults: LLMSettings = {
       apiKey: import.meta.env?.VITE_LLM_API_KEY || '',
       baseUrl: import.meta.env?.VITE_LLM_BASE_URL || 'https://openrouter.ai/api/v1',
-      model: import.meta.env?.VITE_LLM_MODEL || 'microsoft/wizardlm-2-8x22b',
+      model: import.meta.env?.VITE_LLM_MODEL || 'anthropic/claude-3.7-sonnet',
       systemPrompt: '',
+      provider: 'openrouter',
     };
 
-    const remote = await this.fetchSetting<{ apiKey: string; baseUrl: string; model: string; systemPrompt: string }>(LLM_SETTINGS_KEY);
+    const remote = await this.fetchSetting<LLMSettings>(LLM_SETTINGS_KEY);
     if (remote) {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(LLM_SETTINGS_KEY, JSON.stringify(remote));
@@ -211,7 +212,7 @@ export class LocalDatabase {
     }
   }
 
-  async saveLLMSettings(settings: { apiKey: string; baseUrl: string; model: string; systemPrompt: string }): Promise<void> {
+  async saveLLMSettings(settings: LLMSettings): Promise<void> {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(LLM_SETTINGS_KEY, JSON.stringify(settings));
     }

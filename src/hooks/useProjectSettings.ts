@@ -9,8 +9,9 @@ export function useProjectSettings() {
   const [llmSettings, setLLMSettings] = useState<LLMSettings>({
     apiKey: '',
     baseUrl: 'https://openrouter.ai/api/v1',
-    model: 'microsoft/wizardlm-2-8x22b',
+    model: 'anthropic/claude-3.7-sonnet',
     systemPrompt: '',
+    provider: 'openrouter',
   });
 
   useEffect(() => {

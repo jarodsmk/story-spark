@@ -22,10 +22,21 @@ export interface AIPassResult {
   passType: string;
 }
 
+export function isCustomEndpointConfigured(settings?: LLMSettings): boolean {
+  if (!settings || !settings.baseUrl || !settings.baseUrl.trim()) {
+    return false;
+  }
+  // OpenRouter requires an API key. If unconfigured, fallback to server-side Gemini
+  if (settings.baseUrl.includes('openrouter.ai') && (!settings.apiKey || !settings.apiKey.trim())) {
+    return false;
+  }
+  return true;
+}
+
 /**
  * Rewrites the selected passage.
  * Defaults to the server-side Gemini endpoint (`/api/ai/rewrite`).
- * If the user configured a custom third-party BYOM URL (e.g. local Ollama / LMStudio),
+ * If the user configured a custom third-party BYOM URL (e.g. OpenRouter or local Ollama / LMStudio),
  * it calls that custom URL.
  */
 export async function rewritePassage(
@@ -37,11 +48,7 @@ export async function rewritePassage(
     throw new Error('Please select text to rewrite.');
   }
 
-  const isCustomEndpoint =
-    settings &&
-    settings.baseUrl &&
-    settings.baseUrl.trim() !== '' &&
-    !settings.baseUrl.includes('openrouter.ai');
+  const isCustomEndpoint = isCustomEndpointConfigured(settings);
 
   if (!isCustomEndpoint) {
     // Standard path: Call server-side Gemini proxy
@@ -213,11 +220,7 @@ export async function generateManuscriptContent(
     throw new Error('Please describe the content you want to generate.');
   }
 
-  const isCustomEndpoint =
-    settings &&
-    settings.baseUrl &&
-    settings.baseUrl.trim() !== '' &&
-    !settings.baseUrl.includes('openrouter.ai');
+  const isCustomEndpoint = isCustomEndpointConfigured(settings);
 
   if (!isCustomEndpoint) {
     // Standard path: Call server-side Gemini route
@@ -397,11 +400,7 @@ export async function summarizeSceneContent(
     throw new Error('Scene has no text to summarize.');
   }
 
-  const isCustomEndpoint =
-    settings &&
-    settings.baseUrl &&
-    settings.baseUrl.trim() !== '' &&
-    !settings.baseUrl.includes('openrouter.ai');
+  const isCustomEndpoint = isCustomEndpointConfigured(settings);
 
   if (!isCustomEndpoint) {
     const response = await fetch('/api/ai/summarize-scene', {
@@ -496,11 +495,7 @@ export async function generateStorySuggestions(
   options: GenerateStorySuggestionsRequest,
   settings?: LLMSettings
 ): Promise<{ suggestions: StorySuggestion[] }> {
-  const isCustomEndpoint =
-    settings &&
-    settings.baseUrl &&
-    settings.baseUrl.trim() !== '' &&
-    !settings.baseUrl.includes('openrouter.ai');
+  const isCustomEndpoint = isCustomEndpointConfigured(settings);
 
   if (!isCustomEndpoint) {
     const response = await fetch('/api/ai/story-suggestions', {
