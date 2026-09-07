@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { LLMSettings, NovelCustomPrompts } from '../../types/index.ts';
 import { LoreEntry } from '../../engine/lore/loreReference.ts';
-import { generateManuscriptContent, GenerateContentResult } from '../../engine/ai/index.ts';
+import { generateManuscriptContent, GenerateContentResult, estimateWordCountRange } from '../../engine/ai/index.ts';
 import { DEFAULT_AI_PROMPTS } from '../../engine/ai/prompts.ts';
 import { StorySuggestionsTab } from './StorySuggestionsTab.tsx';
 
@@ -117,8 +117,8 @@ export const GenerateContentModal: React.FC<GenerateContentModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'prose' | 'suggestions'>('prose');
   const [prompt, setPrompt] = useState('');
-  const [lengthMode, setLengthMode] = useState<'brief' | 'standard' | 'extended' | 'custom'>('standard');
-  const [customWordCount, setCustomWordCount] = useState<number>(200);
+  const [paragraphOption, setParagraphOption] = useState<'1' | '2' | '3' | 'custom'>('2');
+  const [customParagraphCount, setCustomParagraphCount] = useState<number>(4);
   const [selectedStyle, setSelectedStyle] = useState<string>('default');
   const [customStyleText, setCustomStyleText] = useState<string>('');
   const [systemPrompt, setSystemPrompt] = useState<string>(
@@ -228,13 +228,15 @@ export const GenerateContentModal: React.FC<GenerateContentModalProps> = ({
     setIsGenerating(true);
     setError(null);
 
-    const lengthVal = lengthMode === 'custom' ? customWordCount : lengthMode;
+    const targetParagraphs =
+      paragraphOption === 'custom' ? customParagraphCount : parseInt(paragraphOption, 10);
 
     try {
       const res = await generateManuscriptContent(
         {
           prompt: prompt.trim(),
-          length: lengthVal,
+          paragraphs: targetParagraphs,
+          length: targetParagraphs === 1 ? 'brief' : targetParagraphs === 2 ? 'standard' : 'extended',
           style: selectedStyle,
           customStyle: selectedStyle === 'custom' ? customStyleText : undefined,
           systemPrompt: systemPrompt.trim(),
@@ -414,87 +416,139 @@ export const GenerateContentModal: React.FC<GenerateContentModalProps> = ({
             </div>
           </div>
 
-          {/* 2. Content Length / Word Count Options */}
+          {/* 2. Number of Paragraphs to Generate */}
           <div>
-            <label className="text-xs font-semibold text-stone-300 block mb-1.5">
-              How Much Content to Generate
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold text-stone-300">
+                Number of Paragraphs to Generate
+              </label>
+              <span className="text-[11px] text-amber-400 font-mono">
+                Rough indication: {estimateWordCountRange(paragraphOption === 'custom' ? customParagraphCount : parseInt(paragraphOption, 10)).label}
+              </span>
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button
                 type="button"
-                onClick={() => setLengthMode('brief')}
-                className={`p-2.5 rounded-lg border text-left transition ${
-                  lengthMode === 'brief'
+                onClick={() => setParagraphOption('1')}
+                className={`p-2.5 rounded-lg border text-left transition cursor-pointer ${
+                  paragraphOption === '1'
                     ? 'bg-amber-950/50 border-amber-500/80 text-amber-200'
                     : 'bg-stone-950/50 border-stone-800 hover:bg-stone-800/60 text-stone-300'
                 }`}
               >
-                <div className="font-semibold text-xs">Brief Beat</div>
-                <div className="text-[10px] opacity-75 font-mono mt-0.5">~50–100 words</div>
-                <div className="text-[10px] text-stone-400 mt-1">Short reaction or punchy sentence beat</div>
+                <div className="font-semibold text-xs">1 Paragraph</div>
+                <div className="text-[10px] opacity-80 font-mono mt-0.5 text-amber-300/90">~60–100 words</div>
+                <div className="text-[10px] text-stone-400 mt-1">Single scene beat, focused reaction, or vivid detail</div>
               </button>
 
               <button
                 type="button"
-                onClick={() => setLengthMode('standard')}
-                className={`p-2.5 rounded-lg border text-left transition ${
-                  lengthMode === 'standard'
+                onClick={() => setParagraphOption('2')}
+                className={`p-2.5 rounded-lg border text-left transition cursor-pointer ${
+                  paragraphOption === '2'
                     ? 'bg-amber-950/50 border-amber-500/80 text-amber-200'
                     : 'bg-stone-950/50 border-stone-800 hover:bg-stone-800/60 text-stone-300'
                 }`}
               >
                 <div className="font-semibold text-xs flex items-center gap-1">
-                  <span>Standard</span>
+                  <span>2 Paragraphs</span>
                   <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1 rounded">Default</span>
                 </div>
-                <div className="text-[10px] opacity-75 font-mono mt-0.5">~150–250 words</div>
-                <div className="text-[10px] text-stone-400 mt-1">Full scene beat or dialogue exchange</div>
+                <div className="text-[10px] opacity-80 font-mono mt-0.5 text-amber-300/90">~130–200 words</div>
+                <div className="text-[10px] text-stone-400 mt-1">Standard scene beat or dialogue exchange</div>
               </button>
 
               <button
                 type="button"
-                onClick={() => setLengthMode('extended')}
-                className={`p-2.5 rounded-lg border text-left transition ${
-                  lengthMode === 'extended'
+                onClick={() => setParagraphOption('3')}
+                className={`p-2.5 rounded-lg border text-left transition cursor-pointer ${
+                  paragraphOption === '3'
                     ? 'bg-amber-950/50 border-amber-500/80 text-amber-200'
                     : 'bg-stone-950/50 border-stone-800 hover:bg-stone-800/60 text-stone-300'
                 }`}
               >
-                <div className="font-semibold text-xs">Extended</div>
-                <div className="text-[10px] opacity-75 font-mono mt-0.5">~350–500 words</div>
-                <div className="text-[10px] text-stone-400 mt-1">Full scene section or detailed sequence</div>
+                <div className="font-semibold text-xs">3 Paragraphs</div>
+                <div className="text-[10px] opacity-80 font-mono mt-0.5 text-amber-300/90">~200–300 words</div>
+                <div className="text-[10px] text-stone-400 mt-1">Extended passage, multi-beat action, or atmosphere</div>
               </button>
 
               <button
                 type="button"
-                onClick={() => setLengthMode('custom')}
-                className={`p-2.5 rounded-lg border text-left transition ${
-                  lengthMode === 'custom'
+                onClick={() => setParagraphOption('custom')}
+                className={`p-2.5 rounded-lg border text-left transition cursor-pointer ${
+                  paragraphOption === 'custom'
                     ? 'bg-amber-950/50 border-amber-500/80 text-amber-200'
                     : 'bg-stone-950/50 border-stone-800 hover:bg-stone-800/60 text-stone-300'
                 }`}
               >
-                <div className="font-semibold text-xs">Custom Length</div>
-                <div className="text-[10px] opacity-75 font-mono mt-0.5">{customWordCount} words</div>
-                <div className="text-[10px] text-stone-400 mt-1">Specify target word count</div>
+                <div className="font-semibold text-xs">
+                  {paragraphOption === 'custom' ? `${customParagraphCount} Paragraphs` : 'Custom Count'}
+                </div>
+                <div className="text-[10px] opacity-80 font-mono mt-0.5 text-amber-300/90">
+                  {paragraphOption === 'custom'
+                    ? estimateWordCountRange(customParagraphCount).label
+                    : '1–10 paragraphs'}
+                </div>
+                <div className="text-[10px] text-stone-400 mt-1">Specify custom number of paragraphs</div>
               </button>
             </div>
 
-            {/* Custom word count slider if custom selected */}
-            {lengthMode === 'custom' && (
-              <div className="mt-2.5 p-3 rounded-lg bg-stone-950/70 border border-stone-800 flex items-center gap-4">
+            {/* Custom paragraph count selector and slider */}
+            {paragraphOption === 'custom' && (
+              <div className="mt-2.5 p-3 rounded-lg bg-stone-950/70 border border-stone-800 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-stone-300 font-medium">Paragraphs:</span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setCustomParagraphCount(Math.max(1, customParagraphCount - 1))}
+                        disabled={customParagraphCount <= 1}
+                        className="w-6 h-6 rounded bg-stone-800 hover:bg-stone-700 disabled:opacity-40 disabled:cursor-not-allowed text-stone-200 text-xs flex items-center justify-center transition font-semibold cursor-pointer"
+                        title="Decrease paragraphs"
+                      >
+                        -
+                      </button>
+                      <span className="font-mono text-sm font-semibold text-amber-300 w-7 text-center">
+                        {customParagraphCount}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setCustomParagraphCount(Math.min(10, customParagraphCount + 1))}
+                        disabled={customParagraphCount >= 10}
+                        className="w-6 h-6 rounded bg-stone-800 hover:bg-stone-700 disabled:opacity-40 disabled:cursor-not-allowed text-stone-200 text-xs flex items-center justify-center transition font-semibold cursor-pointer"
+                        title="Increase paragraphs"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <span className="text-xs text-stone-400">
+                      {customParagraphCount === 1 ? 'paragraph' : 'paragraphs'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 font-mono text-xs text-amber-300 bg-amber-950/60 px-2.5 py-1 rounded border border-amber-800/60">
+                    <span className="text-[10px] text-stone-400 font-sans">Roughly:</span>
+                    <span>{estimateWordCountRange(customParagraphCount).label}</span>
+                  </div>
+                </div>
+
                 <input
                   type="range"
-                  min={50}
-                  max={800}
-                  step={25}
-                  value={customWordCount}
-                  onChange={(e) => setCustomWordCount(Number(e.target.value))}
-                  className="flex-1 accent-amber-500 h-1.5 bg-stone-800 rounded-lg cursor-pointer"
+                  min={1}
+                  max={10}
+                  step={1}
+                  value={customParagraphCount}
+                  onChange={(e) => setCustomParagraphCount(Number(e.target.value))}
+                  className="w-full accent-amber-500 h-1.5 bg-stone-800 rounded-lg cursor-pointer"
                 />
-                <div className="flex items-center gap-1.5 font-mono text-xs text-amber-300 bg-amber-950/60 px-2.5 py-1 rounded border border-amber-800/60">
-                  <span>{customWordCount}</span>
-                  <span className="text-[10px] text-stone-400">words</span>
+
+                <div className="flex items-center justify-between text-[10px] text-stone-500 font-mono">
+                  <span>1 par (~60–100 w)</span>
+                  <span>3 par (~200–300 w)</span>
+                  <span>5 par (~325–500 w)</span>
+                  <span>8 par (~520–800 w)</span>
+                  <span>10 par (~650–1k w)</span>
                 </div>
               </div>
             )}
@@ -717,9 +771,17 @@ export const GenerateContentModal: React.FC<GenerateContentModalProps> = ({
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-amber-400" />
                   <span className="text-xs font-semibold text-amber-300">Generated Prose</span>
-                  <span className="text-[10px] font-mono bg-stone-800 px-2 py-0.5 rounded text-stone-300">
-                    {result.wordCount} words
-                  </span>
+                  {(() => {
+                    const pCount =
+                      result.paragraphCount ||
+                      result.generatedText.split(/\n\s*\n/).filter((p) => p.trim().length > 0).length ||
+                      (result.generatedText.trim() ? 1 : 0);
+                    return (
+                      <span className="text-[10px] font-mono bg-stone-800 px-2 py-0.5 rounded text-stone-300">
+                        {pCount} {pCount === 1 ? 'paragraph' : 'paragraphs'} · {result.wordCount} words
+                      </span>
+                    );
+                  })()}
                 </div>
 
                 <div className="flex items-center gap-1.5">
@@ -750,13 +812,17 @@ export const GenerateContentModal: React.FC<GenerateContentModalProps> = ({
               <div className="relative">
                 <textarea
                   value={result.generatedText}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const text = e.target.value;
+                    const words = text.split(/\s+/).filter((w) => w.length > 0).length;
+                    const paras = text.split(/\n\s*\n/).filter((p) => p.trim().length > 0).length || (text.trim() ? 1 : 0);
                     setResult({
                       ...result,
-                      generatedText: e.target.value,
-                      wordCount: e.target.value.split(/\s+/).filter((w) => w.length > 0).length,
-                    })
-                  }
+                      generatedText: text,
+                      wordCount: words,
+                      paragraphCount: paras,
+                    });
+                  }}
                   rows={6}
                   className="w-full bg-stone-950/90 border border-stone-800/80 rounded-lg p-3 text-xs text-stone-100 font-serif leading-relaxed focus:outline-none focus:border-amber-500/60"
                 />

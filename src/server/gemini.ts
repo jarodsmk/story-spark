@@ -121,6 +121,7 @@ router.post('/generate', async (req: Request, res: Response) => {
       prompt,
       systemPrompt,
       length = 'standard',
+      paragraphs,
       style = 'default',
       customStyle,
       selectedText,
@@ -133,9 +134,14 @@ router.post('/generate', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Please describe the content to generate.' });
     }
 
-    // Determine target word count / length description
+    // Determine target paragraph count and rough word count guidance
     let lengthGuidance = '';
-    if (typeof length === 'number') {
+    if (paragraphs && typeof paragraphs === 'number' && paragraphs > 0) {
+      const pCount = Math.round(paragraphs);
+      const minWords = Math.round(pCount * 65);
+      const maxWords = Math.round(pCount * 100);
+      lengthGuidance = `Target length: exactly ${pCount} paragraph${pCount === 1 ? '' : 's'} (roughly ~${minWords}–${maxWords} words). Write exactly ${pCount} distinct, cohesive narrative paragraph${pCount === 1 ? '' : 's'}, separated cleanly by double line breaks (blank lines).`;
+    } else if (typeof length === 'number') {
       lengthGuidance = `Target length: approximately ${length} words.`;
     } else {
       switch (length) {

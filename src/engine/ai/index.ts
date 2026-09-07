@@ -177,8 +177,24 @@ export async function runAIEditorialPass(
   };
 }
 
+/**
+ * Rough estimation of word count depending on the number of fiction paragraphs.
+ * Standard published fiction paragraphs average ~65 to 100 words (dialogue beats may be shorter, descriptive blocks longer).
+ */
+export function estimateWordCountRange(paragraphs: number): { minWords: number; maxWords: number; label: string } {
+  const safeP = Math.max(1, Math.round(paragraphs || 1));
+  const minWords = Math.round(safeP * 65);
+  const maxWords = Math.round(safeP * 100);
+  return {
+    minWords,
+    maxWords,
+    label: `~${minWords.toLocaleString()}–${maxWords.toLocaleString()} words`,
+  };
+}
+
 export interface GenerateContentOptions {
   prompt: string;
+  paragraphs?: number;
   length?: 'brief' | 'standard' | 'extended' | number;
   style?: string;
   customStyle?: string;
@@ -193,6 +209,7 @@ export interface GenerateContentResult {
   generatedText: string;
   prompt: string;
   wordCount: number;
+  paragraphCount?: number;
 }
 
 export interface SummarizeSceneOptions {
@@ -240,6 +257,7 @@ export async function generateManuscriptContent(
         surroundingContext: options.surroundingContext,
         sceneSummaries: options.sceneSummaries,
         temperature: options.temperature ?? 0.75,
+        paragraphs: options.paragraphs,
       }),
     });
 
@@ -248,7 +266,15 @@ export async function generateManuscriptContent(
       throw new Error(err.error || `AI content generation failed (${response.status})`);
     }
 
-    return await response.json();
+    const data = await response.json();
+    const paragraphCount = data.generatedText
+      ? data.generatedText.split(/\n\s*\n/).filter((p: string) => p.trim().length > 0).length || 1
+      : 1;
+
+    return {
+      ...data,
+      paragraphCount,
+    };
   }
 
   // Custom BYOM endpoint (e.g. local Ollama / LMStudio)
@@ -265,7 +291,12 @@ export async function generateManuscriptContent(
     'Return ONLY the raw narrative prose to be inserted directly into the manuscript.';
 
   let lengthGuidance = '';
-  if (typeof options.length === 'number') {
+  if (options.paragraphs && typeof options.paragraphs === 'number' && options.paragraphs > 0) {
+    const pCount = Math.round(options.paragraphs);
+    const minWords = Math.round(pCount * 65);
+    const maxWords = Math.round(pCount * 100);
+    lengthGuidance = `Target length: exactly ${pCount} paragraph${pCount === 1 ? '' : 's'} (roughly ~${minWords}–${maxWords} words). Write exactly ${pCount} distinct, cohesive narrative paragraph${pCount === 1 ? '' : 's'}, separated cleanly by double line breaks (blank lines).`;
+  } else if (typeof options.length === 'number') {
     lengthGuidance = `Target length: approximately ${options.length} words.`;
   } else {
     switch (options.length) {
@@ -375,11 +406,15 @@ export async function generateManuscriptContent(
     }
 
     const wordCount = content.split(/\s+/).filter(w => w.length > 0).length;
+    const paragraphCount = content
+      ? content.split(/\n\s*\n/).filter((p: string) => p.trim().length > 0).length || 1
+      : 1;
 
     return {
       generatedText: content,
       prompt: options.prompt,
       wordCount,
+      paragraphCount,
     };
   } catch (error: any) {
     if (error.name === 'AbortError') {

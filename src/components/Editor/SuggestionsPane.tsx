@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Suggestion } from '../../types/index.ts';
+import { DocumentCategory } from '../../utils/documentType.ts';
 import {
   Sparkles,
   Wand2,
@@ -42,7 +43,7 @@ interface SuggestionsPaneProps {
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
   isCharacterOrWorld?: boolean;
-  documentCategory?: 'scene' | 'character' | 'world';
+  documentCategory?: DocumentCategory;
 }
 
 export const SuggestionsPane: React.FC<SuggestionsPaneProps> = ({

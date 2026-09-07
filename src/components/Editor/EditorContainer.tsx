@@ -4,6 +4,7 @@ import { SuggestionsPane } from './SuggestionsPane.tsx';
 import { PreviewPane } from './PreviewPane.tsx';
 import { Suggestion, LLMSettings, NovelCustomPrompts } from '../../types/index.ts';
 import { LoreEntry } from '../../engine/lore/loreReference.ts';
+import { DocumentCategory } from '../../utils/documentType.ts';
 
 interface EditorContainerProps {
   content: string;
@@ -51,7 +52,7 @@ interface EditorContainerProps {
   isSidebarCollapsed?: boolean;
   onToggleSidebarCollapse?: () => void;
   isCharacterOrWorld?: boolean;
-  documentCategory?: 'scene' | 'character' | 'world';
+  documentCategory?: DocumentCategory;
 }
 
 export const EditorContainer: React.FC<EditorContainerProps> = ({

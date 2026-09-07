@@ -5,6 +5,7 @@ import { Suggestion } from '../../types/index.ts';
 import { LoreEntry } from '../../engine/lore/loreReference.ts';
 import { LoreTextRenderer } from './LoreTextRenderer.tsx';
 import { LoreHoverTooltip } from './LoreHoverTooltip.tsx';
+import { DocumentCategory } from '../../utils/documentType.ts';
 
 interface PreviewPaneProps {
   currentText: string;
@@ -20,7 +21,7 @@ interface PreviewPaneProps {
   loreEntries?: LoreEntry[];
   onOpenFile?: (path: string) => void;
   isCharacterOrWorld?: boolean;
-  documentCategory?: 'scene' | 'character' | 'world';
+  documentCategory?: DocumentCategory;
 }
 
 export const PreviewPane: React.FC<PreviewPaneProps> = ({

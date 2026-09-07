@@ -16,11 +16,11 @@ import {
   Image as ImageIcon,
   Camera,
   PanelLeftClose,
-  PanelLeftOpen,
   Lightbulb,
 } from 'lucide-react';
 import { FileItem } from '../../storage/fs.ts';
 import { Novel, SceneSummary } from '../../types/index.ts';
+import { AppLogo } from '../Common/AppLogo.tsx';
 
 interface SidebarProps {
   sceneFiles: FileItem[];
@@ -98,15 +98,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         className="w-12 bg-stone-950 border-r border-stone-800 flex flex-col h-full flex-shrink-0 text-xs select-none items-center py-2.5 justify-between transition-all duration-150"
       >
         <div className="flex flex-col items-center space-y-2 w-full px-1">
-          {/* Expand toggle */}
+          {/* Logo / Expand toggle */}
           <button
             type="button"
             id="sidebar-expand-toggle-btn"
             onClick={onToggleCollapse}
-            title="Expand Left Menu (Ctrl+B)"
-            className="p-2 text-stone-400 hover:text-amber-400 hover:bg-stone-900 rounded transition-colors"
+            title="StorySpark - Expand Left Menu (Ctrl+B)"
+            className="w-8 h-8 rounded-lg bg-stone-900 border border-stone-800 hover:border-amber-500/60 flex items-center justify-center text-stone-200 hover:text-amber-400 transition-colors group cursor-pointer"
           >
-            <PanelLeftOpen className="w-4 h-4" />
+            <AppLogo className="w-5 h-5 text-stone-200 group-hover:text-amber-400 transition-colors" />
           </button>
 
           <div className="w-6 h-px bg-stone-800 my-1" />
@@ -244,11 +244,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <div className="w-60 bg-stone-950 border-r border-stone-800 flex flex-col h-full flex-shrink-0 text-xs select-none">
       {/* Brand Header */}
       <div className="h-12 border-b border-stone-800 px-3 flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <span className="text-amber-500 font-bold text-lg">⚡</span>
+        <div className="flex items-center space-x-2.5">
+          <div className="w-8 h-8 rounded-lg bg-stone-900 border border-stone-800 flex items-center justify-center flex-shrink-0 shadow-xs group">
+            <AppLogo className="w-5 h-5 text-stone-100 group-hover:text-amber-400 transition-colors" />
+          </div>
           <div>
-            <div className="font-semibold text-stone-200">StorySpark</div>
-            <div className="text-[10px] text-stone-500">Multi-Novel Studio</div>
+            <div className="font-semibold text-stone-200 tracking-tight leading-none">StorySpark</div>
+            <div className="text-[10px] text-stone-500 mt-0.5">Multi-Novel Studio</div>
           </div>
         </div>
 

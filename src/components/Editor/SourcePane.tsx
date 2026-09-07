@@ -26,6 +26,7 @@ import { LoreHoverTooltip } from './LoreHoverTooltip.tsx';
 import { NewLoreModal } from './NewLoreModal.tsx';
 import { LoreTextRenderer } from './LoreTextRenderer.tsx';
 import { GenerateContentModal } from './GenerateContentModal.tsx';
+import { DocumentCategory } from '../../utils/documentType.ts';
 
 interface SourcePaneProps {
   content: string;
@@ -64,7 +65,7 @@ interface SourcePaneProps {
   allSceneSummaries?: Array<{ title: string; summary: string }>;
   onOpenSceneSummary?: () => void;
   isCharacterOrWorld?: boolean;
-  documentCategory?: 'scene' | 'character' | 'world';
+  documentCategory?: DocumentCategory;
 }
 
 export const SourcePane: React.FC<SourcePaneProps> = ({
