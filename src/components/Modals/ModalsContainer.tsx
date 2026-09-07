@@ -4,7 +4,7 @@ import { ImportModal } from './ImportModal.tsx';
 import { ExportModal } from './ExportModal.tsx';
 import { NovelModal } from './NovelModal.tsx';
 import { CoverUploadModal } from './CoverUploadModal.tsx';
-import { Novel } from '../../types/index.ts';
+import { Novel, CoverTheme } from '../../types/index.ts';
 import { NovelCrafterParseResult } from '../../engine/novelcrafter/index.ts';
 import { NovelCrafterImportOptions, NovelCrafterImportSummary } from '../../engine/novelcrafter/importer.ts';
 
@@ -21,7 +21,7 @@ interface ModalsProps {
   setIsCoverUploadOpen?: (v: boolean) => void;
   coverUploadNovel?: Novel | null;
   onOpenCoverUpload?: (novel: Novel) => void;
-  onSaveCover?: (novelId: string, coverDataUrl: string | undefined) => Promise<void>;
+  onSaveCover?: (novelId: string, coverDataUrl: string | undefined, theme?: CoverTheme) => Promise<void>;
   compiledPreview: string;
   createScene: (title: string) => Promise<string>;
   createBibleEntry: (name: string, type: 'character' | 'world') => Promise<string>;
@@ -38,6 +38,7 @@ interface ModalsProps {
     targetWordCount?: number;
     template?: 'standard' | 'blank' | 'rich';
     coverImage?: string;
+    coverTheme?: CoverTheme;
   }) => Promise<{ novel: Novel; initialScenePath: string }>;
   onUpdateNovel: (id: string, updates: Partial<Omit<Novel, 'id' | 'createdAt'>>) => Promise<void>;
   onDeleteNovel: (id: string) => Promise<string>;
@@ -158,11 +159,11 @@ export const ModalsContainer: React.FC<ModalsProps> = ({
         isOpen={isCoverUploadOpen}
         onClose={() => setIsCoverUploadOpen?.(false)}
         novel={coverUploadNovel || activeNovel || null}
-        onSaveCover={async (novelId, coverDataUrl) => {
+        onSaveCover={async (novelId, coverDataUrl, theme) => {
           if (onSaveCover) {
-            await onSaveCover(novelId, coverDataUrl);
+            await onSaveCover(novelId, coverDataUrl, theme);
           } else {
-            await onUpdateNovel(novelId, { coverImage: coverDataUrl });
+            await onUpdateNovel(novelId, { coverImage: coverDataUrl, coverTheme: theme });
           }
         }}
       />

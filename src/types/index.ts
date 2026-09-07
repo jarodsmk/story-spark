@@ -81,6 +81,19 @@ export interface NovelCustomPrompts {
   storySuggestions?: string;
 }
 
+export type TailwindPaletteSteps = 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 950;
+
+export interface CoverTheme {
+  primaryHex: string;
+  secondaryHex: string;
+  accentHex: string;
+  ambientBgHex: string;
+  paletteRgb: Record<TailwindPaletteSteps, string>; // "R G B" format for Tailwind CSS variables
+  paletteHex: Record<TailwindPaletteSteps, string>; // "#hex" format for inline styles/preview swatches
+  prominentColors: string[]; // List of 4-6 prominent hex colors for UI display
+  isMonochrome?: boolean;
+}
+
 export interface Novel {
   id: string;
   title: string;
@@ -90,6 +103,7 @@ export interface Novel {
   createdAt: number;
   updatedAt: number;
   coverImage?: string;
+  coverTheme?: CoverTheme;
   customPrompts?: NovelCustomPrompts;
 }
 

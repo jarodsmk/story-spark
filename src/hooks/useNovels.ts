@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Novel } from '../types/index.ts';
+import { Novel, CoverTheme } from '../types/index.ts';
 import { db, DEFAULT_NOVELS } from '../storage/db.ts';
 import { fs } from '../storage/fs.ts';
 import { sanitizeFilename } from '../engine/markdown/index.ts';
@@ -54,6 +54,7 @@ export function useNovels() {
     targetWordCount?: number;
     template?: 'standard' | 'blank' | 'rich';
     coverImage?: string;
+    coverTheme?: CoverTheme;
   }): Promise<{ novel: Novel; initialScenePath: string }> => {
     const slug = sanitizeFilename(data.title.toLowerCase()) || 'novel';
     const uniqueId = `${slug}-${Date.now().toString(36)}`;
@@ -68,6 +69,7 @@ export function useNovels() {
       createdAt: now,
       updatedAt: now,
       coverImage: data.coverImage,
+      coverTheme: data.coverTheme,
     };
 
     const initialScenePath = `novels/${uniqueId}/scenes/01-chapter-1.md`;
@@ -215,6 +217,14 @@ export function useNovels() {
     };
   }, [novels, activeNovelId]);
 
+  const updateNovelCover = useCallback(async (
+    id: string,
+    coverImage: string | undefined,
+    coverTheme?: CoverTheme
+  ) => {
+    await updateNovel(id, { coverImage, coverTheme });
+  }, [updateNovel]);
+
   return {
     novels,
     activeNovelId,
@@ -223,6 +233,7 @@ export function useNovels() {
     selectNovel,
     createNovel,
     updateNovel,
+    updateNovelCover,
     deleteNovel,
     duplicateNovel,
     importNovelCrafter,

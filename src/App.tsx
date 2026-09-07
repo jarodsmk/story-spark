@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { fs } from './storage/fs.ts';
-import { Suggestion, Novel } from './types/index.ts';
+import { Suggestion, Novel, CoverTheme } from './types/index.ts';
 import { runAllChecks } from './engine/checks/index.ts';
 import { rewritePassage, runAIEditorialPass } from './engine/ai/index.ts';
 import { applySuggestion, replacePassage, applyMultipleSuggestions } from './engine/diff/index.ts';
@@ -11,6 +11,7 @@ import { useProjectSettings } from './hooks/useProjectSettings.ts';
 import { useManuscriptActions } from './hooks/useManuscriptActions.ts';
 import { useLoreManager } from './hooks/useLoreManager.ts';
 import { useSceneSummaries } from './hooks/useSceneSummaries.ts';
+import { useCoverTheme } from './hooks/useCoverTheme.ts';
 import { getDocumentCategory, isCharacterOrWorldDocument } from './utils/documentType.ts';
 
 import { Sidebar } from './components/Navigation/Sidebar.tsx';
@@ -31,6 +32,12 @@ export function App() {
     settings.llmSettings,
     novelsState.activeNovel?.customPrompts?.summarization
   );
+
+  const { currentTheme, isThemeActive } = useCoverTheme(novelsState.activeNovel, {
+    onSaveTheme: async (novelId, theme) => {
+      await novelsState.updateNovel(novelId, { coverTheme: theme });
+    },
+  });
 
   const [baseline, setBaseline] = useState('');
   const [saving, setSaving] = useState(false);
@@ -305,7 +312,13 @@ export function App() {
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-stone-900 text-stone-100 select-none">
+    <div
+      id="storyspark-app-root"
+      className="flex h-screen w-screen overflow-hidden bg-stone-900 text-stone-100 select-none relative"
+      style={{
+        backgroundImage: isThemeActive && currentTheme ? 'var(--app-glow)' : undefined,
+      }}
+    >
       <Sidebar
         sceneFiles={files.sceneFiles}
         bibleFiles={files.bibleFiles}
@@ -341,6 +354,8 @@ export function App() {
         }}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={handleToggleSidebarCollapse}
+        currentTheme={currentTheme}
+        isThemeActive={isThemeActive}
       />
 
       <EditorContainer
@@ -431,8 +446,8 @@ export function App() {
         setIsCoverUploadOpen={setOpenCoverModal}
         coverUploadNovel={coverTargetNovel}
         onOpenCoverUpload={handleOpenCoverUpload}
-        onSaveCover={async (novelId, coverDataUrl) => {
-          await novelsState.updateNovel(novelId, { coverImage: coverDataUrl });
+        onSaveCover={async (novelId, coverDataUrl, theme) => {
+          await novelsState.updateNovelCover(novelId, coverDataUrl, theme);
         }}
         compiledPreview={ms.compiledPreview}
         createScene={files.createScene}

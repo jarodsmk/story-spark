@@ -19,7 +19,7 @@ import {
   Lightbulb,
 } from 'lucide-react';
 import { FileItem } from '../../storage/fs.ts';
-import { Novel, SceneSummary } from '../../types/index.ts';
+import { Novel, SceneSummary, CoverTheme } from '../../types/index.ts';
 import { AppLogo } from '../Common/AppLogo.tsx';
 
 interface SidebarProps {
@@ -45,6 +45,8 @@ interface SidebarProps {
   onOpenSceneSummaries?: (scenePath?: string) => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  currentTheme?: CoverTheme | null;
+  isThemeActive?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -70,6 +72,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenSceneSummaries,
   isCollapsed = false,
   onToggleCollapse,
+  currentTheme,
+  isThemeActive = false,
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -358,8 +362,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="flex-1 min-w-0 text-left bg-stone-900 hover:bg-stone-800/90 border border-stone-800 hover:border-stone-700 p-1.5 rounded transition-colors flex items-center justify-between gap-1.5"
             >
               <div className="min-w-0 flex-1">
-                <div className="font-semibold text-stone-100 truncate text-[11px] leading-tight">
-                  {activeNovel.title}
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="font-semibold text-stone-100 truncate text-[11px] leading-tight flex-1">
+                    {activeNovel.title}
+                  </span>
+                  {isThemeActive && currentTheme && (
+                    <span
+                      className="flex-shrink-0 inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-stone-950/90 border border-stone-800 shadow-2xs"
+                      title={`Artwork theme active: Primary ${currentTheme.primaryHex}`}
+                    >
+                      <span
+                        className="w-1.5 h-1.5 rounded-full"
+                        style={{ backgroundColor: currentTheme.primaryHex }}
+                      />
+                      <span
+                        className="w-1.5 h-1.5 rounded-full"
+                        style={{ backgroundColor: currentTheme.secondaryHex }}
+                      />
+                    </span>
+                  )}
                 </div>
                 {activeNovel.genre && (
                   <div className="text-[9px] text-amber-400/80 truncate mt-0.5 font-medium">

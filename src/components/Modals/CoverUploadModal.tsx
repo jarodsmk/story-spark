@@ -11,19 +11,20 @@ import {
   FileImage,
   RefreshCw,
 } from 'lucide-react';
-import { Novel } from '../../types/index.ts';
+import { Novel, CoverTheme } from '../../types/index.ts';
 import {
   processCoverImageFile,
   isValidImageFile,
   formatFileSize,
   estimateDataUrlSize,
 } from '../../utils/imageUtils.ts';
+import { extractCoverTheme } from '../../engine/theme/coverTheme.ts';
 
 interface CoverUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
   novel: Novel | null;
-  onSaveCover: (novelId: string, coverDataUrl: string | undefined) => Promise<void>;
+  onSaveCover: (novelId: string, coverDataUrl: string | undefined, theme?: CoverTheme) => Promise<void>;
 }
 
 export const CoverUploadModal: React.FC<CoverUploadModalProps> = ({
@@ -33,6 +34,8 @@ export const CoverUploadModal: React.FC<CoverUploadModalProps> = ({
   onSaveCover,
 }) => {
   const [stagedCover, setStagedCover] = useState<string | undefined>(undefined);
+  const [stagedTheme, setStagedTheme] = useState<CoverTheme | null>(null);
+  const [isExtractingTheme, setIsExtractingTheme] = useState<boolean>(false);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -49,11 +52,36 @@ export const CoverUploadModal: React.FC<CoverUploadModalProps> = ({
   useEffect(() => {
     if (novel && isOpen) {
       setStagedCover(novel.coverImage);
+      setStagedTheme(novel.coverTheme || null);
       setErrorMessage(null);
       setFileDetails(null);
       setIsDragging(false);
+
+      if (novel.coverImage && !novel.coverTheme) {
+        setIsExtractingTheme(true);
+        extractCoverTheme(novel.coverImage).then((thm) => {
+          setStagedTheme(thm);
+          setIsExtractingTheme(false);
+        });
+      }
     }
   }, [novel, isOpen]);
+
+  // Extract theme whenever a new cover is staged
+  useEffect(() => {
+    if (stagedCover) {
+      setIsExtractingTheme(true);
+      extractCoverTheme(stagedCover)
+        .then((thm) => {
+          setStagedTheme(thm);
+        })
+        .finally(() => {
+          setIsExtractingTheme(false);
+        });
+    } else {
+      setStagedTheme(null);
+    }
+  }, [stagedCover]);
 
   // Support paste (Ctrl+V / Cmd+V) of image data
   useEffect(() => {
@@ -155,7 +183,7 @@ export const CoverUploadModal: React.FC<CoverUploadModalProps> = ({
     setIsSaving(true);
     setErrorMessage(null);
     try {
-      await onSaveCover(novel.id, stagedCover);
+      await onSaveCover(novel.id, stagedCover, stagedTheme || undefined);
       onClose();
     } catch (err: any) {
       setErrorMessage(err?.message || 'Failed to save cover picture.');
@@ -278,10 +306,10 @@ export const CoverUploadModal: React.FC<CoverUploadModalProps> = ({
 
             {/* File info pill */}
             {stagedCover && (
-              <div className="mt-3 text-center">
+              <div className="mt-3 text-center w-full">
                 {fileDetails ? (
                   <div className="text-[10px] text-stone-400 space-y-0.5">
-                    <div className="text-stone-300 font-medium truncate max-w-[180px]">
+                    <div className="text-stone-300 font-medium truncate max-w-[180px] mx-auto">
                       {fileDetails.name}
                     </div>
                     <div className="text-[9px] text-emerald-400 font-mono">
@@ -291,6 +319,60 @@ export const CoverUploadModal: React.FC<CoverUploadModalProps> = ({
                 ) : (
                   <div className="text-[9px] text-stone-500 font-mono">
                     ~{formatFileSize(estimateDataUrlSize(stagedCover))} cover art loaded
+                  </div>
+                )}
+
+                {/* Extracted Theme Palette Card */}
+                {stagedTheme && (
+                  <div
+                    id="cover-extracted-theme-card"
+                    className="mt-3.5 w-full p-2.5 rounded-lg bg-stone-950/80 border border-stone-800 space-y-2 text-left shadow-inner"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-stone-300 font-medium text-[10px]">
+                        <Sparkles className="w-3 h-3 text-amber-400" />
+                        <span>Prominent Colors</span>
+                      </div>
+                      <span className="text-[9px] text-emerald-400 font-mono">
+                        Theme Ready
+                      </span>
+                    </div>
+
+                    {/* Swatches bar */}
+                    <div className="flex items-center gap-1.5 pt-0.5">
+                      {stagedTheme.prominentColors.slice(0, 5).map((col, idx) => (
+                        <div
+                          key={idx}
+                          className="flex-1 h-5 rounded border border-white/10 shadow-xs relative cursor-default"
+                          style={{ backgroundColor: col }}
+                          title={`Extracted Color: ${col}`}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Key tokens */}
+                    <div className="grid grid-cols-2 gap-1 text-[9px] pt-1 border-t border-stone-800/80">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full border border-white/20 flex-shrink-0"
+                          style={{ backgroundColor: stagedTheme.primaryHex }}
+                        />
+                        <span className="text-stone-400">Primary:</span>
+                        <span className="font-mono text-stone-200">{stagedTheme.primaryHex}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full border border-white/20 flex-shrink-0"
+                          style={{ backgroundColor: stagedTheme.secondaryHex }}
+                        />
+                        <span className="text-stone-400">Accent:</span>
+                        <span className="font-mono text-stone-200">{stagedTheme.secondaryHex}</span>
+                      </div>
+                    </div>
+
+                    <p className="text-[9px] text-stone-500 leading-tight">
+                      Studio theme will dynamically update to match this picture when active.
+                    </p>
                   </div>
                 )}
               </div>

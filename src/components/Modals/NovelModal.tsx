@@ -20,12 +20,13 @@ import {
   Sliders,
   Info,
 } from 'lucide-react';
-import { Novel, NovelCustomPrompts } from '../../types/index.ts';
+import { Novel, NovelCustomPrompts, CoverTheme } from '../../types/index.ts';
 import { NovelCrafterParseResult } from '../../engine/novelcrafter/index.ts';
 import { NovelCrafterImportOptions, NovelCrafterImportSummary } from '../../engine/novelcrafter/importer.ts';
 import { NovelCrafterImportView } from './NovelCrafterImportView.tsx';
 import { CoverImageInput } from '../Common/CoverImageInput.tsx';
 import { AI_PROMPT_CONFIG, DEFAULT_AI_PROMPTS } from '../../engine/ai/prompts.ts';
+import { extractCoverTheme } from '../../engine/theme/coverTheme.ts';
 
 interface NovelModalProps {
   isOpen: boolean;
@@ -42,6 +43,7 @@ interface NovelModalProps {
     targetWordCount?: number;
     template?: 'standard' | 'blank' | 'rich';
     coverImage?: string;
+    coverTheme?: CoverTheme;
   }) => Promise<{ novel: Novel; initialScenePath: string }>;
   onUpdateNovel: (id: string, updates: Partial<Omit<Novel, 'id' | 'createdAt'>>) => Promise<void>;
   onDeleteNovel: (id: string) => Promise<string>;
@@ -193,12 +195,22 @@ export const NovelModal: React.FC<NovelModalProps> = ({
     if (!editingNovelId || !editTitle.trim()) return;
     setIsSubmitting(true);
     try {
+      const existing = novels.find(n => n.id === editingNovelId);
+      let updatedTheme: CoverTheme | undefined = existing?.coverTheme;
+
+      if (editCoverImage && editCoverImage !== existing?.coverImage) {
+        updatedTheme = await extractCoverTheme(editCoverImage);
+      } else if (!editCoverImage) {
+        updatedTheme = undefined;
+      }
+
       await onUpdateNovel(editingNovelId, {
         title: editTitle.trim(),
         genre: editGenre.trim(),
         description: editDescription.trim(),
         targetWordCount: editTargetWords,
         coverImage: editCoverImage,
+        coverTheme: updatedTheme,
       });
       setActiveTab('list');
       setEditingNovelId(null);
@@ -213,6 +225,11 @@ export const NovelModal: React.FC<NovelModalProps> = ({
     setIsSubmitting(true);
     try {
       const genreToSave = newGenre === 'Other' && newCustomGenre.trim() ? newCustomGenre.trim() : newGenre;
+      let initialTheme: CoverTheme | undefined = undefined;
+      if (newCoverImage) {
+        initialTheme = await extractCoverTheme(newCoverImage);
+      }
+
       await onCreateNovel({
         title: newTitle.trim(),
         genre: genreToSave,
@@ -220,6 +237,7 @@ export const NovelModal: React.FC<NovelModalProps> = ({
         targetWordCount: newTargetWords,
         template: newTemplate,
         coverImage: newCoverImage,
+        coverTheme: initialTheme,
       });
       // Reset form
       setNewTitle('');
