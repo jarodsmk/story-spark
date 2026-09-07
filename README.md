@@ -1,4 +1,6 @@
-# StorySpark ⚡
+# StorySpark 📕✨
+
+<img width="1408" height="768" alt="Gemini_Generated_Image_u6xavwu6xavwu6xa" src="https://github.com/user-attachments/assets/3bdcadea-b5b4-4db4-b0b9-8b5cc18c16e3" />
 
 **StorySpark** is a private, local-first author studio and personal replacement for Novelcrafter built with **Tauri 2, React 18, TypeScript, SQLite, MongoDB, and a Rust filesystem layer**.
 
