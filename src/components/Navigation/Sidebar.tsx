@@ -37,6 +37,7 @@ interface SidebarProps {
   onSelectNovel?: (id: string) => void;
   onOpenNovelManager?: () => void;
   onUploadCover?: (novel: Novel) => void;
+  onOpenNovelPrompts?: (novel: Novel) => void;
   summaries?: Record<string, SceneSummary>;
   onOpenSceneSummaries?: (scenePath?: string) => void;
   isCollapsed?: boolean;
@@ -59,6 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectNovel,
   onOpenNovelManager,
   onUploadCover,
+  onOpenNovelPrompts,
   summaries = {},
   onOpenSceneSummaries,
   isCollapsed = false,
@@ -259,20 +261,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="text-[9px] uppercase tracking-wider text-stone-500 font-semibold px-1 mb-1.5 flex items-center justify-between">
             <span>Active Novel</span>
             <div className="flex items-center gap-1.5">
-              {onUploadCover && (
+              {onOpenNovelPrompts && (
                 <button
                   type="button"
-                  id="sidebar-upload-cover-btn"
+                  id="sidebar-quick-prompts-btn"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onUploadCover(activeNovel);
+                    onOpenNovelPrompts(activeNovel);
                   }}
-                  title={activeNovel.coverImage ? 'Change Cover Art' : 'Upload Cover Art'}
-                  className="text-[9px] text-amber-500 hover:text-amber-400 font-medium flex items-center gap-0.5 hover:underline"
+                  title="Customize System AI Prompts for this novel"
+                  className="text-[9px] text-amber-400 hover:text-amber-300 font-medium flex items-center gap-0.5 hover:underline"
                 >
-                  <ImageIcon className="w-2.5 h-2.5" />
-                  <span>{activeNovel.coverImage ? 'Cover' : '+ Cover'}</span>
+                  <Sparkles className="w-2.5 h-2.5" />
+                  <span>AI Prompts</span>
                 </button>
+              )}
+              {onUploadCover && (
+                <>
+                  <span className="font-mono text-[9px] text-stone-600">·</span>
+                  <button
+                    type="button"
+                    id="sidebar-upload-cover-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onUploadCover(activeNovel);
+                    }}
+                    title={activeNovel.coverImage ? 'Change Cover Art' : 'Upload Cover Art'}
+                    className="text-[9px] text-stone-400 hover:text-stone-300 font-medium flex items-center gap-0.5 hover:underline"
+                  >
+                    <ImageIcon className="w-2.5 h-2.5" />
+                    <span>{activeNovel.coverImage ? 'Cover' : '+ Cover'}</span>
+                  </button>
+                </>
               )}
               <span className="font-mono text-[9px] text-stone-600">·</span>
               <span className="font-mono text-[9px] text-amber-500/80">{novels.length} total</span>
@@ -375,19 +395,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 })}
               </div>
 
-              {onOpenNovelManager && (
-                <div className="p-1 space-y-0.5 bg-stone-950/50">
+              <div className="p-1 space-y-0.5 bg-stone-950/50">
+                {onOpenNovelPrompts && (
                   <button
+                    type="button"
+                    id="sidebar-novel-dropdown-prompts-btn"
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      onOpenNovelPrompts(activeNovel);
+                    }}
+                    className="w-full text-left px-2 py-1 text-[11px] text-amber-300 hover:bg-stone-800 rounded flex items-center gap-1.5 font-medium transition-colors"
+                  >
+                    <Sparkles className="w-3 h-3 text-amber-400" /> Customize AI Prompts...
+                  </button>
+                )}
+                {onOpenNovelManager && (
+                  <button
+                    type="button"
                     onClick={() => {
                       setIsDropdownOpen(false);
                       onOpenNovelManager();
                     }}
-                    className="w-full text-left px-2 py-1 text-[11px] text-amber-400 hover:bg-stone-800 rounded flex items-center gap-1.5 font-medium"
+                    className="w-full text-left px-2 py-1 text-[11px] text-stone-300 hover:bg-stone-800 rounded flex items-center gap-1.5 font-medium transition-colors"
                   >
                     <Plus className="w-3 h-3" /> New Novel / Manage All...
                   </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
         </div>

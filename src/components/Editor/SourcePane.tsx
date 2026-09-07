@@ -13,7 +13,7 @@ import {
   Compass,
   Tag,
 } from 'lucide-react';
-import { Suggestion, LLMSettings } from '../../types/index.ts';
+import { Suggestion, LLMSettings, NovelCustomPrompts } from '../../types/index.ts';
 import {
   LoreEntry,
   findLoreReferences,
@@ -57,6 +57,7 @@ interface SourcePaneProps {
   ) => Promise<LoreEntry>;
   onOpenFile?: (path: string) => void;
   llmSettings?: LLMSettings;
+  customPrompts?: NovelCustomPrompts;
   currentSceneSummary?: string;
   currentSceneSummaryWordCount?: number;
   priorSceneSummaries?: Array<{ title: string; summary: string }>;
@@ -92,6 +93,7 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
   onCreateLoreEntry,
   onOpenFile,
   llmSettings,
+  customPrompts,
   currentSceneSummary,
   currentSceneSummaryWordCount,
   priorSceneSummaries = [],
@@ -802,6 +804,7 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
         surroundingContext={content}
         activeFileName={title}
         llmSettings={llmSettings}
+        customPrompts={customPrompts}
         priorSceneSummaries={priorSceneSummaries}
         currentSceneSummary={currentSceneSummary}
         allSceneSummaries={allSceneSummaries}

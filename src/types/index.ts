@@ -73,6 +73,14 @@ export interface SceneSummary {
   updatedAt: number;
 }
 
+export interface NovelCustomPrompts {
+  storyGeneration?: string;
+  summarization?: string;
+  rewrite?: string;
+  editorialPass?: string;
+  storySuggestions?: string;
+}
+
 export interface Novel {
   id: string;
   title: string;
@@ -82,6 +90,7 @@ export interface Novel {
   createdAt: number;
   updatedAt: number;
   coverImage?: string;
+  customPrompts?: NovelCustomPrompts;
 }
 
 export interface LLMSettings {
@@ -131,4 +140,5 @@ export interface GenerateStorySuggestionsRequest {
   currentSceneTitle?: string;
   surroundingContext?: string;
   count?: number;
+  systemPrompt?: string;
 }

@@ -17,9 +17,10 @@ import {
   Layers,
   Lightbulb,
 } from 'lucide-react';
-import { LLMSettings } from '../../types/index.ts';
+import { LLMSettings, NovelCustomPrompts } from '../../types/index.ts';
 import { LoreEntry } from '../../engine/lore/loreReference.ts';
 import { generateManuscriptContent, GenerateContentResult } from '../../engine/ai/index.ts';
+import { DEFAULT_AI_PROMPTS } from '../../engine/ai/prompts.ts';
 import { StorySuggestionsTab } from './StorySuggestionsTab.tsx';
 
 interface GenerateContentModalProps {
@@ -31,6 +32,7 @@ interface GenerateContentModalProps {
   surroundingContext?: string;
   activeFileName?: string;
   llmSettings?: LLMSettings;
+  customPrompts?: NovelCustomPrompts;
   priorSceneSummaries?: Array<{ title: string; summary: string; filePath?: string }>;
   currentSceneSummary?: string;
   allSceneSummaries?: Array<{ title: string; summary: string; filePath?: string }>;
@@ -40,13 +42,7 @@ interface GenerateContentModalProps {
   onInsertContent: (text: string, mode: 'replace-or-cursor' | 'append') => void;
 }
 
-const DEFAULT_SYSTEM_PROMPT =
-  'You are an expert novelist and creative fiction writing assistant.\n' +
-  'Generate compelling, immersion-rich fiction prose that seamlessly matches the story\'s world, character voice, and narrative tone.\n' +
-  '- Maintain consistent perspective (POV), tense, and cadence with the manuscript.\n' +
-  '- Adhere closely to the requested length and writing style.\n' +
-  '- Emphasize "show, don\'t tell" with grounded sensory details and authentic character motivations.\n' +
-  '- Output ONLY the creative manuscript prose without any meta-commentary, preamble, greetings, or quotation wrappers.';
+const DEFAULT_SYSTEM_PROMPT = DEFAULT_AI_PROMPTS.storyGeneration;
 
 const STYLE_OPTIONS = [
   {
@@ -110,6 +106,7 @@ export const GenerateContentModal: React.FC<GenerateContentModalProps> = ({
   surroundingContext = '',
   activeFileName = '',
   llmSettings,
+  customPrompts,
   priorSceneSummaries = [],
   currentSceneSummary = '',
   allSceneSummaries = [],
@@ -124,7 +121,9 @@ export const GenerateContentModal: React.FC<GenerateContentModalProps> = ({
   const [customWordCount, setCustomWordCount] = useState<number>(200);
   const [selectedStyle, setSelectedStyle] = useState<string>('default');
   const [customStyleText, setCustomStyleText] = useState<string>('');
-  const [systemPrompt, setSystemPrompt] = useState<string>(DEFAULT_SYSTEM_PROMPT);
+  const [systemPrompt, setSystemPrompt] = useState<string>(
+    customPrompts?.storyGeneration?.trim() || llmSettings?.systemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT
+  );
   const [showSystemPrompt, setShowSystemPrompt] = useState<boolean>(false);
 
   // Scene Summaries Context state
@@ -159,9 +158,11 @@ export const GenerateContentModal: React.FC<GenerateContentModalProps> = ({
         setSummaryScope('all');
       }
 
-      // Automatically include the system prompt, incorporating user settings if present
+      // Automatically include the system prompt, incorporating novel custom prompts or user settings if present
       const initialSystemPrompt =
-        llmSettings?.systemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT;
+        customPrompts?.storyGeneration?.trim() ||
+        llmSettings?.systemPrompt?.trim() ||
+        DEFAULT_SYSTEM_PROMPT;
       setSystemPrompt(initialSystemPrompt);
 
       // If user had selected text that isn't a placeholder, suggest continuing or expanding
@@ -172,7 +173,7 @@ export const GenerateContentModal: React.FC<GenerateContentModalProps> = ({
         setPrompt('');
       }
     }
-  }, [isOpen, selectedText, llmSettings]);
+  }, [isOpen, selectedText, llmSettings, customPrompts]);
 
   // Keyboard escape listener
   useEffect(() => {
@@ -357,6 +358,7 @@ export const GenerateContentModal: React.FC<GenerateContentModalProps> = ({
               currentSceneSummary={currentSceneSummary}
               surroundingContext={surroundingContext}
               llmSettings={llmSettings}
+              customSystemPrompt={customPrompts?.storySuggestions}
               onUseIdeaInGenerator={handleUseIdeaInGenerator}
               onInsertContent={onInsertContent}
             />

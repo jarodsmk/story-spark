@@ -244,13 +244,14 @@ router.post('/generate', async (req: Request, res: Response) => {
  */
 router.post('/summarize-scene', async (req: Request, res: Response) => {
   try {
-    const { sceneContent, sceneTitle, instructions } = req.body;
+    const { sceneContent, sceneTitle, instructions, systemPrompt } = req.body;
 
     if (!sceneContent || typeof sceneContent !== 'string' || !sceneContent.trim()) {
       return res.status(400).json({ error: 'Missing sceneContent to summarize.' });
     }
 
     const systemInstruction =
+      systemPrompt ||
       'You are an expert fiction novelist, story editor, and manuscript analyst. ' +
       'Generate a concise, information-dense summary of the provided fiction scene (approximately 60 to 120 words). ' +
       'Focus strictly on: ' +
@@ -308,9 +309,11 @@ router.post('/story-suggestions', async (req: Request, res: Response) => {
       currentSceneTitle = '',
       surroundingContext = '',
       count = 4,
+      systemPrompt,
     } = req.body;
 
     const systemInstruction =
+      systemPrompt ||
       'You are a world-class fiction story consultant, narrative architect, and creative brainstorming partner for authors. ' +
       'Your goal is to provide deeply engaging, unexpected, high-stakes narrative suggestions that advance the story logically and dramatically. ' +
       'MANDATORY RULES:\n' +
@@ -444,7 +447,7 @@ interface RawAISuggestion {
  */
 router.post('/analyze', async (req: Request, res: Response) => {
   try {
-    const { text, passType = 'all', instruction, contextTitle } = req.body;
+    const { text, passType = 'all', instruction, contextTitle, systemPrompt } = req.body;
 
     if (!text || typeof text !== 'string') {
       return res.status(400).json({ error: 'Missing text to analyze' });
@@ -483,7 +486,7 @@ router.post('/analyze', async (req: Request, res: Response) => {
       passFocus += ` Additional user guidance: ${instruction}`;
     }
 
-    const systemInstruction =
+    const defaultInstruction =
       'You are an award-winning fiction editor and manuscript consultant. ' +
       'Analyze the provided novel manuscript excerpt and provide 3 to 6 high-value, actionable prose improvements. ' +
       'CRITICAL REQUIREMENT: For each suggestion, "originalText" MUST be an EXACT, VERBATIM substring copied directly from the manuscript text so it can be located in the editor. ' +
@@ -496,6 +499,8 @@ router.post('/analyze', async (req: Request, res: Response) => {
       '  "replacementText": "The improved prose replacement",\n' +
       '  "severity": "suggestion" | "warning" | "info"\n' +
       '}]';
+
+    const systemInstruction = systemPrompt || defaultInstruction;
 
     const prompt = `${passFocus}\n${contextTitle ? `Scene Context: ${contextTitle}\n` : ''}\nManuscript text to evaluate:\n"""\n${text}\n"""`;
 

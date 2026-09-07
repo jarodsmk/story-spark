@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { SourcePane } from './SourcePane.tsx';
 import { SuggestionsPane } from './SuggestionsPane.tsx';
 import { PreviewPane } from './PreviewPane.tsx';
-import { Suggestion, LLMSettings } from '../../types/index.ts';
+import { Suggestion, LLMSettings, NovelCustomPrompts } from '../../types/index.ts';
 import { LoreEntry } from '../../engine/lore/loreReference.ts';
 
 interface EditorContainerProps {
@@ -42,6 +42,7 @@ interface EditorContainerProps {
   ) => Promise<LoreEntry>;
   onOpenFile?: (path: string) => void;
   llmSettings?: LLMSettings;
+  customPrompts?: NovelCustomPrompts;
   currentSceneSummary?: string;
   currentSceneSummaryWordCount?: number;
   priorSceneSummaries?: Array<{ title: string; summary: string }>;
@@ -86,6 +87,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
   onCreateLoreEntry,
   onOpenFile,
   llmSettings,
+  customPrompts,
   currentSceneSummary,
   currentSceneSummaryWordCount,
   priorSceneSummaries,
@@ -235,6 +237,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
           onCreateLoreEntry={onCreateLoreEntry}
           onOpenFile={onOpenFile}
           llmSettings={llmSettings}
+          customPrompts={customPrompts}
           currentSceneSummary={currentSceneSummary}
           currentSceneSummaryWordCount={currentSceneSummaryWordCount}
           priorSceneSummaries={priorSceneSummaries}

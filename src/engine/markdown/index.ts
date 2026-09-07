@@ -68,24 +68,52 @@ export function exportScene(scene: SceneDocument, format: 'markdown' | 'text' = 
   }
 }
 
+export interface CompileOptions {
+  sceneSeparator?: 'divider' | 'asterisms' | 'blank';
+  chapterHeadingStyle?: 'numbered' | 'original' | 'simple';
+  novelTitle?: string;
+}
+
 /**
- * Compiles an entire novel manuscript from an ordered list of scenes.
+ * Compiles an entire novel manuscript from an ordered list of scenes to clean Markdown.
  */
 export function compileNovelManuscript(
   scenes: SceneDocument[],
   bibleEntities: BibleEntity[] = [],
-  includeBibleAppendix: boolean = false
+  includeBibleAppendix: boolean = false,
+  options?: CompileOptions
 ): string {
   const sorted = [...scenes].sort((a, b) => a.order - b.order);
   let output = '';
 
-  for (const scene of sorted) {
-    output += `# ${scene.title}\n\n`;
-    output += `${scene.content.trim()}\n\n---\n\n`;
+  const separatorStr = options?.sceneSeparator === 'asterisms'
+    ? '\n\n* * *\n\n'
+    : options?.sceneSeparator === 'blank'
+    ? '\n\n\n\n'
+    : '\n\n---\n\n';
+
+  for (let i = 0; i < sorted.length; i++) {
+    const scene = sorted[i];
+    let heading = scene.title;
+    if (options?.chapterHeadingStyle === 'numbered') {
+      const clean = scene.title.replace(/^\d+-/, '').trim();
+      heading = `Chapter ${i + 1}: ${clean}`;
+    } else if (options?.chapterHeadingStyle === 'simple') {
+      heading = scene.title.replace(/^\d+-/, '').trim();
+    }
+
+    output += `# ${heading}\n\n`;
+    output += `${scene.content.trim()}`;
+
+    if (i < sorted.length - 1) {
+      output += separatorStr;
+    } else {
+      output += '\n\n';
+    }
   }
 
   if (includeBibleAppendix && bibleEntities.length > 0) {
-    output += `# Appendix: Story Bible\n\n`;
+    output += `---\n\n# Appendix: Story Bible\n\n`;
     for (const entity of bibleEntities) {
       output += `## ${entity.name} (${entity.type.toUpperCase()})\n\n`;
       output += `${entity.content.trim()}\n\n`;
@@ -94,3 +122,76 @@ export function compileNovelManuscript(
 
   return output.trim();
 }
+
+/**
+ * Compiles an entire novel manuscript into clean, formatted plain text (.txt).
+ */
+export function compileNovelText(
+  scenes: SceneDocument[],
+  bibleEntities: BibleEntity[] = [],
+  includeBibleAppendix: boolean = false,
+  options?: CompileOptions
+): string {
+  const sorted = [...scenes].sort((a, b) => a.order - b.order);
+  let output = '';
+
+  if (options?.novelTitle) {
+    output += `${options.novelTitle.toUpperCase()}\n`;
+    output += `${'='.repeat(Math.min(60, options.novelTitle.length * 2))}\n\n\n`;
+  }
+
+  const separatorStr = options?.sceneSeparator === 'asterisms'
+    ? '\n\n*   *   *\n\n'
+    : options?.sceneSeparator === 'blank'
+    ? '\n\n\n\n'
+    : '\n\n------------------------------------------------------------\n\n';
+
+  for (let i = 0; i < sorted.length; i++) {
+    const scene = sorted[i];
+    let heading = scene.title;
+    if (options?.chapterHeadingStyle === 'numbered') {
+      const clean = scene.title.replace(/^\d+-/, '').trim();
+      heading = `CHAPTER ${i + 1}: ${clean.toUpperCase()}`;
+    } else {
+      heading = scene.title.replace(/^\d+-/, '').trim().toUpperCase();
+    }
+
+    output += `${heading}\n`;
+    output += `${'-'.repeat(Math.min(40, heading.length))}\n\n`;
+
+    // Strip markdown formatting
+    const plainContent = scene.content
+      .replace(/^#{1,6}\s+/gm, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/^>\s+/gm, '');
+
+    output += `${plainContent.trim()}`;
+
+    if (i < sorted.length - 1) {
+      output += separatorStr;
+    } else {
+      output += '\n\n';
+    }
+  }
+
+  if (includeBibleAppendix && bibleEntities.length > 0) {
+    output += `\n\n============================================================\n`;
+    output += `APPENDIX: STORY BIBLE & LORE\n`;
+    output += `============================================================\n\n`;
+    for (const entity of bibleEntities) {
+      output += `[${entity.type.toUpperCase()}] ${entity.name}\n`;
+      output += `${'-'.repeat(entity.name.length + 12)}\n`;
+      const cleanEntity = entity.content
+        .replace(/^#{1,6}\s+/gm, '')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
+        .replace(/\*([^*]+)\*/g, '$1');
+      output += `${cleanEntity.trim()}\n\n`;
+    }
+  }
+
+  return output.trim();
+}
+

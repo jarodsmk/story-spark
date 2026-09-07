@@ -6,7 +6,8 @@ import { summarizeSceneContent } from '../engine/ai/index.ts';
 export function useSceneSummaries(
   activeNovelId: string = 'default',
   sceneFiles: FileItem[] = [],
-  llmSettings?: LLMSettings
+  llmSettings?: LLMSettings,
+  customSystemPrompt?: string
 ) {
   const [summaries, setSummaries] = useState<Record<string, SceneSummary>>({});
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
@@ -141,6 +142,7 @@ export function useSceneSummaries(
             sceneContent,
             sceneTitle,
             instructions,
+            systemPrompt: customSystemPrompt,
           },
           customSettings || llmSettings
         );
@@ -169,7 +171,7 @@ export function useSceneSummaries(
         setGeneratingPath(null);
       }
     },
-    [summaries, persistSummaries, llmSettings]
+    [summaries, persistSummaries, llmSettings, customSystemPrompt]
   );
 
   // Batch generate summaries for all scenes that don't have one yet

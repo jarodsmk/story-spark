@@ -3,8 +3,10 @@ import {
   sanitizeFilename, 
   parseImportedDocument, 
   exportScene, 
-  compileNovelManuscript 
+  compileNovelManuscript,
+  compileNovelText
 } from '../src/engine/markdown/index.ts';
+import { generateNovelPDF, cleanProseForExport } from '../src/engine/export/pdfExport.ts';
 import { SceneDocument, BibleEntity } from '../src/types/index.ts';
 
 describe('Markdown & Safe File System Transformations', () => {
@@ -85,6 +87,127 @@ describe('Markdown & Safe File System Transformations', () => {
       expect(posChap1).toBeLessThan(posChap2);
       expect(posChap2).toBeLessThan(posAppendix);
       expect(compiled).toContain('Hero (CHARACTER)');
+    });
+
+    it('compiles only the selected subset of scenes when user deselects scenes', () => {
+      const allScenes: SceneDocument[] = [
+        { id: '1', title: 'Chapter 1: The Outset', filename: '01.md', content: 'Beginning of journey.', order: 1 },
+        { id: '2', title: 'Draft Deleted Scene', filename: '02.md', content: 'This should be omitted.', order: 2 },
+        { id: '3', title: 'Chapter 2: The Forest', filename: '03.md', content: 'Deep in the woods.', order: 3 },
+      ];
+
+      // Author selects only Scene 1 and Scene 3
+      const selectedScenes = [allScenes[0], allScenes[2]];
+      const compiled = compileNovelManuscript(selectedScenes, [], false, {
+        chapterHeadingStyle: 'numbered',
+        sceneSeparator: 'divider',
+      });
+
+      expect(compiled).toContain('Chapter 1: The Outset');
+      expect(compiled).toContain('Beginning of journey.');
+      expect(compiled).toContain('Chapter 2: The Forest');
+      expect(compiled).toContain('Deep in the woods.');
+      expect(compiled).not.toContain('Draft Deleted Scene');
+      expect(compiled).not.toContain('This should be omitted.');
+      expect(compiled).toContain('---');
+    });
+  });
+
+  describe('compileNovelText', () => {
+    it('compiles clean plain text without markdown syntax and with clean headers and dividers', () => {
+      const selectedScenes: SceneDocument[] = [
+        {
+          id: '1',
+          title: '01-the-arrival',
+          filename: '01.md',
+          content: '# Header\n\n[Kaelen](bible/characters/kaelen.md) walked into **the mist**.',
+          order: 1,
+        },
+        {
+          id: '2',
+          title: 'The Tavern',
+          filename: '02.md',
+          content: 'Warm fire crackled inside.',
+          order: 2,
+        },
+      ];
+
+      const txt = compileNovelText(selectedScenes, [], false, {
+        novelTitle: 'Echoes of Mist',
+        chapterHeadingStyle: 'numbered',
+        sceneSeparator: 'asterisms',
+      });
+
+      expect(txt).toContain('ECHOES OF MIST');
+      expect(txt).toContain('CHAPTER 1: THE-ARRIVAL');
+      expect(txt).toContain('Kaelen walked into the mist.');
+      expect(txt).not.toContain('[Kaelen](bible/characters/kaelen.md)');
+      expect(txt).not.toContain('**the mist**');
+      expect(txt).toContain('*   *   *');
+      expect(txt).toContain('CHAPTER 2: THE TAVERN');
+      expect(txt).toContain('Warm fire crackled inside.');
+    });
+  });
+
+  describe('generateNovelPDF', () => {
+    it('cleans prose properly for typesetting and PDF layout', () => {
+      const dirty = '# Heading 1\n\n[Hero](characters/hero.md) drew his **silver sword** and looked *carefully*.\n\n> A dire whisper.';
+      const clean = cleanProseForExport(dirty);
+      expect(clean).not.toContain('# Heading 1');
+      expect(clean).toContain('Hero drew his silver sword and looked carefully.');
+      expect(clean).not.toContain('[');
+      expect(clean).not.toContain('**');
+      expect(clean).not.toContain('*carefully*');
+      expect(clean).toContain('A dire whisper.');
+    });
+
+    it('generates a valid multi-page jsPDF instance for selected novel scenes', () => {
+      const scenes = [
+        {
+          id: '1',
+          title: 'The Great Expedition',
+          content: 'The sea was quiet before dawn. Sailors prepared the sails in absolute silence.',
+          order: 1,
+        },
+        {
+          id: '2',
+          title: 'The Lighthouse',
+          content: 'From the tall tower, a lone light swept across the waves.',
+          order: 2,
+        },
+      ];
+      const bible = [
+        {
+          id: 'b1',
+          name: 'Captain Jack',
+          type: 'character',
+          content: 'Seasoned navigator with a wooden compass.',
+        },
+      ];
+
+      const pdf = generateNovelPDF({
+        title: 'Voyage of the Sea Wolf',
+        genre: 'Nautical Adventure',
+        author: 'Jane Author',
+        scenes,
+        bibleEntities: bible,
+        includeBibleAppendix: true,
+        includeCoverPage: true,
+        pageNumbers: true,
+        fontFamily: 'times',
+        chapterHeadingStyle: 'numbered',
+        sceneSeparator: 'pagebreak',
+      });
+
+      expect(pdf).toBeDefined();
+      const numPages = pdf.getNumberOfPages();
+      // Should have cover page + chapter pages + appendix page
+      expect(numPages).toBeGreaterThanOrEqual(3);
+
+      const blob = pdf.output('blob');
+      expect(blob).toBeDefined();
+      expect(blob.size).toBeGreaterThan(1000);
+      expect(blob.type).toContain('pdf');
     });
   });
 });

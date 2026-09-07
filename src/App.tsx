@@ -28,7 +28,8 @@ export function App() {
   const sceneSummaries = useSceneSummaries(
     novelsState.activeNovelId,
     files.sceneFiles,
-    settings.llmSettings
+    settings.llmSettings,
+    novelsState.activeNovel?.customPrompts?.summarization
   );
 
   const [baseline, setBaseline] = useState('');
@@ -38,6 +39,8 @@ export function App() {
   const [openSettings, setOpenSettings] = useState(false);
   const [openImport, setOpenImport] = useState(false);
   const [openNovelManager, setOpenNovelManager] = useState(false);
+  const [novelModalTab, setNovelModalTab] = useState<'list' | 'create' | 'edit' | 'import' | 'prompts'>('list');
+  const [novelModalNovelId, setNovelModalNovelId] = useState<string>('');
   const [openSummariesModal, setOpenSummariesModal] = useState(false);
   const [summaryModalTargetFile, setSummaryModalTargetFile] = useState<string>('');
   const [genAI, setGenAI] = useState(false);
@@ -83,6 +86,18 @@ export function App() {
   const handleOpenCoverUpload = (novel: Novel) => {
     setCoverTargetNovel(novel);
     setOpenCoverModal(true);
+  };
+
+  const handleOpenNovelManager = () => {
+    setNovelModalTab('list');
+    setNovelModalNovelId(novelsState.activeNovelId);
+    setOpenNovelManager(true);
+  };
+
+  const handleOpenNovelPrompts = (novel: Novel) => {
+    setNovelModalTab('prompts');
+    setNovelModalNovelId(novel.id);
+    setOpenNovelManager(true);
   };
 
   const ms = useManuscriptActions(
@@ -189,7 +204,12 @@ export function App() {
     setGenAI(true);
     setAiErr(null);
     try {
-      const res = await rewritePassage(selText, inst, settings.llmSettings);
+      const res = await rewritePassage(
+        selText,
+        inst,
+        settings.llmSettings,
+        novelsState.activeNovel?.customPrompts?.rewrite
+      );
       handleChange(replacePassage(hist.state, selRange.start, selRange.end, res.rewrittenText));
     } catch (err: any) {
       setAiErr(err.message || 'Drafting failed.');
@@ -215,6 +235,7 @@ export function App() {
         passType: passType as any,
         instruction,
         contextTitle: files.activeFileName,
+        systemPrompt: novelsState.activeNovel?.customPrompts?.editorialPass,
       });
 
       const adjustedSuggestions = result.suggestions.map(s => {
@@ -310,7 +331,8 @@ export function App() {
         novels={novelsState.novels}
         activeNovel={novelsState.activeNovel}
         onSelectNovel={novelsState.selectNovel}
-        onOpenNovelManager={() => setOpenNovelManager(true)}
+        onOpenNovelManager={handleOpenNovelManager}
+        onOpenNovelPrompts={handleOpenNovelPrompts}
         onUploadCover={handleOpenCoverUpload}
         summaries={sceneSummaries.summaries}
         onOpenSceneSummaries={(path) => {
@@ -365,6 +387,7 @@ export function App() {
         onCreateLoreEntry={handleCreateLoreEntry}
         onOpenFile={loadFile}
         llmSettings={settings.llmSettings}
+        customPrompts={novelsState.activeNovel?.customPrompts}
         currentSceneSummary={currentSummary?.summary}
         currentSceneSummaryWordCount={currentSummary?.wordCount}
         priorSceneSummaries={priorSummaries}
@@ -402,6 +425,8 @@ export function App() {
         setIsExportOpen={ms.setIsExportOpen}
         isNovelOpen={openNovelManager}
         setIsNovelOpen={setOpenNovelManager}
+        initialNovelModalTab={novelModalTab}
+        initialNovelModalNovelId={novelModalNovelId}
         isCoverUploadOpen={openCoverModal}
         setIsCoverUploadOpen={setOpenCoverModal}
         coverUploadNovel={coverTargetNovel}
@@ -425,6 +450,10 @@ export function App() {
         onImportNovelCrafter={novelsState.importNovelCrafter}
         novelTitle={novelsState.activeNovel?.title}
         activeWordCount={activeWordCount}
+        sceneFiles={files.sceneFiles}
+        bibleFiles={files.bibleFiles}
+        activeFilePath={files.activeFilePath}
+        currentEditorContent={hist.state}
       />
 
       <SceneSummaryModal

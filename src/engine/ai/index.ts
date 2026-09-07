@@ -4,6 +4,7 @@ import {
   StorySuggestion,
   GenerateStorySuggestionsRequest,
 } from '../../types/index.ts';
+import { DEFAULT_AI_PROMPTS } from './prompts.ts';
 
 export interface RewriteResult {
   rewrittenText: string;
@@ -14,6 +15,7 @@ export interface AIPassOptions {
   passType?: 'prose-flow' | 'show-dont-tell' | 'sensory' | 'dialogue' | 'pacing' | 'all';
   instruction?: string;
   contextTitle?: string;
+  systemPrompt?: string;
 }
 
 export interface AIPassResult {
@@ -42,12 +44,14 @@ export function isCustomEndpointConfigured(settings?: LLMSettings): boolean {
 export async function rewritePassage(
   selectedPassage: string,
   instruction: string,
-  settings?: LLMSettings
+  settings?: LLMSettings,
+  customSystemPrompt?: string
 ): Promise<RewriteResult> {
   if (!selectedPassage.trim()) {
     throw new Error('Please select text to rewrite.');
   }
 
+  const effectiveSystemPrompt = customSystemPrompt || settings?.systemPrompt || DEFAULT_AI_PROMPTS.rewrite;
   const isCustomEndpoint = isCustomEndpointConfigured(settings);
 
   if (!isCustomEndpoint) {
@@ -60,7 +64,7 @@ export async function rewritePassage(
       body: JSON.stringify({
         selectedPassage,
         instruction,
-        systemPrompt: settings?.systemPrompt,
+        systemPrompt: effectiveSystemPrompt,
       }),
     });
 
@@ -76,12 +80,7 @@ export async function rewritePassage(
   const baseUrl = (settings.baseUrl || '').replace(/\/+$/, '');
   const url = `${baseUrl}/chat/completions`;
 
-  const systemMessage =
-    settings.systemPrompt ||
-    'You are an expert novelist editor and writing assistant. ' +
-    'Rewrite ONLY the provided passage according to the instructions. ' +
-    'Maintain the voice, character perspective, and genre tone. ' +
-    'Do not include preamble, quotes, explanations, or commentary—return ONLY the revised passage text.';
+  const systemMessage = effectiveSystemPrompt;
 
   const prompt = `Instruction: ${instruction}\n\nPassage to revise:\n"""\n${selectedPassage}\n"""`;
 
@@ -161,6 +160,7 @@ export async function runAIEditorialPass(
       passType: options.passType || 'all',
       instruction: options.instruction,
       contextTitle: options.contextTitle,
+      systemPrompt: options.systemPrompt,
     }),
   });
 
@@ -199,6 +199,7 @@ export interface SummarizeSceneOptions {
   sceneContent: string;
   sceneTitle?: string;
   instructions?: string;
+  systemPrompt?: string;
 }
 
 export interface SummarizeSceneResult {
@@ -402,6 +403,8 @@ export async function summarizeSceneContent(
 
   const isCustomEndpoint = isCustomEndpointConfigured(settings);
 
+  const effectiveSystemPrompt = options.systemPrompt || DEFAULT_AI_PROMPTS.summarization;
+
   if (!isCustomEndpoint) {
     const response = await fetch('/api/ai/summarize-scene', {
       method: 'POST',
@@ -412,6 +415,7 @@ export async function summarizeSceneContent(
         sceneContent: options.sceneContent,
         sceneTitle: options.sceneTitle,
         instructions: options.instructions,
+        systemPrompt: effectiveSystemPrompt,
       }),
     });
 
@@ -427,15 +431,7 @@ export async function summarizeSceneContent(
   const baseUrl = (settings.baseUrl || '').replace(/\/+$/, '');
   const url = `${baseUrl}/chat/completions`;
 
-  const systemInstruction =
-    'You are an expert fiction novelist, story editor, and manuscript analyst. ' +
-    'Generate a concise, information-dense summary of the provided fiction scene (approximately 60 to 120 words). ' +
-    'Focus strictly on: ' +
-    '1. Key plot developments and revelations that occurred in this scene. ' +
-    '2. Main characters present, their core motivations, interactions, and emotional shifts. ' +
-    '3. The immediate ending state, unresolved conflicts, or narrative hook setting up subsequent scenes. ' +
-    'Do NOT include any meta-commentary, introductory remarks ("In this scene..."), bullet formatting, or conversational tone. ' +
-    'Output ONLY the single, cohesive narrative summary paragraph, crafted specifically to serve as background context for AI story continuation and plotting.';
+  const systemInstruction = effectiveSystemPrompt;
 
   let promptText = `Scene Title: ${options.sceneTitle || 'Untitled Scene'}\n\n`;
   if (options.instructions) {
@@ -497,13 +493,18 @@ export async function generateStorySuggestions(
 ): Promise<{ suggestions: StorySuggestion[] }> {
   const isCustomEndpoint = isCustomEndpointConfigured(settings);
 
+  const effectiveSystemPrompt = options.systemPrompt || settings?.systemPrompt || DEFAULT_AI_PROMPTS.storySuggestions;
+
   if (!isCustomEndpoint) {
     const response = await fetch('/api/ai/story-suggestions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(options),
+      body: JSON.stringify({
+        ...options,
+        systemPrompt: effectiveSystemPrompt,
+      }),
     });
 
     if (!response.ok) {
@@ -518,10 +519,7 @@ export async function generateStorySuggestions(
   const baseUrl = (settings.baseUrl || '').replace(/\/+$/, '');
   const url = `${baseUrl}/chat/completions`;
 
-  const systemInstruction =
-    'You are a world-class fiction story consultant and narrative architect. ' +
-    'Provide creative story suggestions grounded in the provided scene summaries, characters, and lore. ' +
-    'Output MUST be valid JSON with a "suggestions" array.';
+  const systemInstruction = effectiveSystemPrompt;
 
   let prompt = `Current Working Scene: ${options.currentSceneTitle || 'Untitled Scene'}\n`;
   if (options.focusType && options.focusType !== 'all') {

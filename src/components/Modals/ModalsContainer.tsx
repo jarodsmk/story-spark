@@ -1,5 +1,5 @@
 import React from 'react';
-import { fs } from '../../storage/fs.ts';
+import { fs, FileItem } from '../../storage/fs.ts';
 import { ImportModal } from './ImportModal.tsx';
 import { ExportModal } from './ExportModal.tsx';
 import { NovelModal } from './NovelModal.tsx';
@@ -15,6 +15,8 @@ interface ModalsProps {
   setIsExportOpen: (v: boolean) => void;
   isNovelOpen: boolean;
   setIsNovelOpen: (v: boolean) => void;
+  initialNovelModalTab?: 'list' | 'create' | 'edit' | 'import' | 'prompts';
+  initialNovelModalNovelId?: string;
   isCoverUploadOpen?: boolean;
   setIsCoverUploadOpen?: (v: boolean) => void;
   coverUploadNovel?: Novel | null;
@@ -46,6 +48,10 @@ interface ModalsProps {
   ) => Promise<{ novel: Novel; firstScenePath: string; summary: NovelCrafterImportSummary }>;
   novelTitle?: string;
   activeWordCount?: number;
+  sceneFiles?: FileItem[];
+  bibleFiles?: FileItem[];
+  activeFilePath?: string;
+  currentEditorContent?: string;
 }
 
 export const ModalsContainer: React.FC<ModalsProps> = ({
@@ -55,6 +61,8 @@ export const ModalsContainer: React.FC<ModalsProps> = ({
   setIsExportOpen,
   isNovelOpen,
   setIsNovelOpen,
+  initialNovelModalTab,
+  initialNovelModalNovelId,
   isCoverUploadOpen = false,
   setIsCoverUploadOpen,
   coverUploadNovel = null,
@@ -76,6 +84,10 @@ export const ModalsContainer: React.FC<ModalsProps> = ({
   onImportNovelCrafter,
   novelTitle = 'Novel',
   activeWordCount = 0,
+  sceneFiles = [],
+  bibleFiles = [],
+  activeFilePath,
+  currentEditorContent,
 }) => {
   const handleNovelCrafterImport = async (
     parsed: NovelCrafterParseResult,
@@ -111,6 +123,11 @@ export const ModalsContainer: React.FC<ModalsProps> = ({
         onClose={() => setIsExportOpen(false)}
         compiledMarkdown={compiledPreview}
         novelTitle={novelTitle}
+        genre={activeNovel?.genre}
+        sceneFiles={sceneFiles}
+        bibleFiles={bibleFiles}
+        activeFilePath={activeFilePath}
+        currentEditorContent={currentEditorContent}
       />
 
       <NovelModal
@@ -118,6 +135,8 @@ export const ModalsContainer: React.FC<ModalsProps> = ({
         onClose={() => setIsNovelOpen(false)}
         novels={novels}
         activeNovelId={activeNovelId}
+        initialTab={initialNovelModalTab}
+        initialNovelId={initialNovelModalNovelId}
         onSelectNovel={async (id) => {
           await onSelectNovel(id);
         }}

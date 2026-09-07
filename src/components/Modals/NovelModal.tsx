@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   BookOpen,
@@ -15,18 +15,25 @@ import {
   FileArchive,
   Image as ImageIcon,
   Camera,
+  RotateCcw,
+  CheckCircle2,
+  Sliders,
+  Info,
 } from 'lucide-react';
-import { Novel } from '../../types/index.ts';
+import { Novel, NovelCustomPrompts } from '../../types/index.ts';
 import { NovelCrafterParseResult } from '../../engine/novelcrafter/index.ts';
 import { NovelCrafterImportOptions, NovelCrafterImportSummary } from '../../engine/novelcrafter/importer.ts';
 import { NovelCrafterImportView } from './NovelCrafterImportView.tsx';
 import { CoverImageInput } from '../Common/CoverImageInput.tsx';
+import { AI_PROMPT_CONFIG, DEFAULT_AI_PROMPTS } from '../../engine/ai/prompts.ts';
 
 interface NovelModalProps {
   isOpen: boolean;
   onClose: () => void;
   novels: Novel[];
   activeNovelId: string;
+  initialTab?: 'list' | 'create' | 'edit' | 'import' | 'prompts';
+  initialNovelId?: string;
   onSelectNovel: (id: string) => Promise<void>;
   onCreateNovel: (data: {
     title: string;
@@ -78,13 +85,79 @@ export const NovelModal: React.FC<NovelModalProps> = ({
   onOpenScene,
   activeWordCount = 0,
   onOpenCoverUpload,
+  initialTab,
+  initialNovelId,
 }) => {
-  const [activeTab, setActiveTab] = useState<'list' | 'create' | 'edit' | 'import'>('list');
+  const [activeTab, setActiveTab] = useState<'list' | 'create' | 'edit' | 'import' | 'prompts'>(initialTab || 'list');
   const [editingNovelId, setEditingNovelId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const activeNovel: Novel = novels.find(n => n.id === activeNovelId) || novels[0];
+  const activeNovel: Novel = novels.find(n => n.id === activeNovelId) || novels[0] || ({} as Novel);
+
+  // Novel AI Prompts state
+  const [promptNovelId, setPromptNovelId] = useState<string>(initialNovelId || activeNovelId);
+  const [promptState, setPromptState] = useState<NovelCustomPrompts>({});
+  const [activePromptKey, setActivePromptKey] = useState<keyof NovelCustomPrompts>('storyGeneration');
+  const [promptSaveSuccess, setPromptSaveSuccess] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (initialTab) {
+        setActiveTab(initialTab);
+      }
+      const targetId = initialNovelId || activeNovelId;
+      setPromptNovelId(targetId);
+      const targetNovel = novels.find(n => n.id === targetId) || activeNovel;
+      setPromptState(targetNovel?.customPrompts || {});
+    }
+  }, [isOpen, initialTab, initialNovelId, activeNovelId]);
+
+  useEffect(() => {
+    const targetNovel = novels.find(n => n.id === promptNovelId);
+    if (targetNovel) {
+      setPromptState(targetNovel.customPrompts || {});
+    }
+  }, [promptNovelId, novels]);
+
+  const targetPromptNovel = novels.find(n => n.id === promptNovelId) || activeNovel;
+
+  const handlePromptChange = (key: keyof NovelCustomPrompts, value: string) => {
+    setPromptState(prev => ({
+      ...prev,
+      [key]: value,
+    }));
+    setPromptSaveSuccess(false);
+  };
+
+  const handleResetPromptToDefault = (key: keyof NovelCustomPrompts) => {
+    setPromptState(prev => ({
+      ...prev,
+      [key]: DEFAULT_AI_PROMPTS[key],
+    }));
+    setPromptSaveSuccess(false);
+  };
+
+  const handleResetAllPromptsToDefault = () => {
+    setPromptState({ ...DEFAULT_AI_PROMPTS });
+    setPromptSaveSuccess(false);
+  };
+
+  const handleSavePrompts = async () => {
+    if (!promptNovelId) return;
+    setIsSubmitting(true);
+    try {
+      await onUpdateNovel(promptNovelId, {
+        customPrompts: { ...promptState },
+      });
+      setPromptSaveSuccess(true);
+      setTimeout(() => {
+        setPromptSaveSuccess(false);
+      }, 3000);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // Form states for New Novel
   const [newTitle, setNewTitle] = useState('');
@@ -210,6 +283,15 @@ export const NovelModal: React.FC<NovelModalProps> = ({
                 }`}
               >
                 All Novels
+              </button>
+              <button
+                id="novel-modal-tab-prompts"
+                onClick={() => { setActiveTab('prompts'); setEditingNovelId(null); }}
+                className={`px-3 py-1 rounded transition-colors flex items-center gap-1.5 ${
+                  activeTab === 'prompts' ? 'bg-amber-600 text-white font-medium' : 'text-stone-400 hover:text-stone-200'
+                }`}
+              >
+                <Sparkles className="w-3 h-3 text-amber-400" /> AI Prompts
               </button>
               <button
                 onClick={() => { setActiveTab('create'); setEditingNovelId(null); }}
@@ -376,6 +458,18 @@ export const NovelModal: React.FC<NovelModalProps> = ({
                               Switch to Novel
                             </button>
                           )}
+
+                          <button
+                            title="Customize system AI prompts for this novel"
+                            onClick={() => {
+                              setPromptNovelId(novel.id);
+                              setActiveTab('prompts');
+                            }}
+                            className="p-1.5 text-stone-400 hover:text-amber-400 bg-stone-900 hover:bg-stone-800 rounded border border-stone-800 flex items-center gap-1 text-[11px] transition-colors"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                            <span className="hidden sm:inline">AI Prompts</span>
+                          </button>
 
                           <button
                             title={novel.coverImage ? 'Change cover picture' : 'Upload cover picture'}
@@ -684,6 +778,232 @@ export const NovelModal: React.FC<NovelModalProps> = ({
               }}
               onCancel={() => setActiveTab('list')}
             />
+          </div>
+        )}
+
+        {/* Tab 5: AI System Prompts Customization */}
+        {activeTab === 'prompts' && (
+          <div className="flex-1 flex flex-col overflow-hidden bg-stone-900">
+            {/* Top Novel Selector & Actions Bar */}
+            <div className="px-4 py-3 border-b border-stone-800 bg-stone-950/60 flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
+              <div className="flex items-center gap-2.5">
+                <span className="text-[11px] font-medium text-stone-400">Novel:</span>
+                <select
+                  value={promptNovelId}
+                  onChange={(e) => setPromptNovelId(e.target.value)}
+                  className="bg-stone-900 border border-stone-700 text-stone-100 rounded px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:border-amber-500 max-w-[260px]"
+                >
+                  {novels.map((n) => (
+                    <option key={n.id} value={n.id}>
+                      {n.title} {n.id === activeNovelId ? '(Active)' : ''}
+                    </option>
+                  ))}
+                </select>
+                {targetPromptNovel?.genre && (
+                  <span className="text-[10px] bg-stone-800 text-stone-400 px-2 py-0.5 rounded border border-stone-700">
+                    {targetPromptNovel.genre}
+                  </span>
+                )}
+                {promptNovelId === activeNovelId && (
+                  <span className="text-[10px] bg-amber-950/80 text-amber-300 border border-amber-700/60 px-2 py-0.5 rounded font-medium">
+                    Active Story
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                {promptSaveSuccess && (
+                  <span className="text-[11px] text-emerald-400 flex items-center gap-1 font-medium bg-emerald-950/60 border border-emerald-800/80 px-2.5 py-1 rounded">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    Saved for {targetPromptNovel?.title || 'novel'}!
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={handleResetAllPromptsToDefault}
+                  className="px-2.5 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white rounded text-xs font-medium flex items-center gap-1.5 border border-stone-700 transition-colors"
+                  title="Reset all system prompts for this novel to factory defaults"
+                >
+                  <RotateCcw className="w-3 h-3 text-stone-400" />
+                  Reset All to Defaults
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSavePrompts}
+                  disabled={isSubmitting}
+                  className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  {isSubmitting ? 'Saving Prompts...' : 'Save Prompts'}
+                </button>
+              </div>
+            </div>
+
+            {/* Main Prompts Workspace: Sidebar + Editor */}
+            <div className="flex-1 flex overflow-hidden">
+              {/* Left Column: List of Prompt Categories */}
+              <div className="w-64 border-r border-stone-800 p-2.5 space-y-1.5 overflow-y-auto bg-stone-950/30 flex-shrink-0">
+                <div className="px-2 py-1 text-[10px] font-bold tracking-wider text-stone-400 uppercase">
+                  Customizable Prompts
+                </div>
+
+                {AI_PROMPT_CONFIG.map((cfg) => {
+                  const isSelected = activePromptKey === cfg.key;
+                  const currentValue =
+                    promptState[cfg.key] !== undefined
+                      ? promptState[cfg.key]
+                      : DEFAULT_AI_PROMPTS[cfg.key];
+                  const isCustomized =
+                    currentValue !== undefined &&
+                    currentValue.trim() !== DEFAULT_AI_PROMPTS[cfg.key].trim();
+
+                  return (
+                    <button
+                      key={cfg.key}
+                      type="button"
+                      onClick={() => {
+                        setActivePromptKey(cfg.key);
+                        setPromptSaveSuccess(false);
+                      }}
+                      className={`w-full text-left p-2 rounded-lg border transition-all flex flex-col gap-1 ${
+                        isSelected
+                          ? 'bg-amber-600/15 border-amber-600/60 text-white shadow-sm'
+                          : 'bg-stone-900/60 border-stone-800 text-stone-300 hover:bg-stone-800/80 hover:border-stone-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-semibold text-xs leading-tight line-clamp-1">
+                          {cfg.title}
+                        </span>
+                        {isCustomized ? (
+                          <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.2 rounded font-medium flex-shrink-0">
+                            Custom
+                          </span>
+                        ) : (
+                          <span className="text-[9px] bg-stone-800 text-stone-400 px-1.5 py-0.2 rounded font-mono flex-shrink-0">
+                            Default
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-stone-400 leading-tight line-clamp-1">
+                        {cfg.category}
+                      </span>
+                    </button>
+                  );
+                })}
+
+                <div className="pt-2 px-2 border-t border-stone-800/70 text-[11px] text-stone-400 flex items-start gap-1.5 leading-normal">
+                  <Info className="w-3.5 h-3.5 text-stone-500 flex-shrink-0 mt-0.5" />
+                  <span>
+                    Changes are saved specifically to{' '}
+                    <strong className="text-stone-300">
+                      {targetPromptNovel?.title || 'this novel'}
+                    </strong>
+                    . Other novels maintain their own independent instructions.
+                  </span>
+                </div>
+              </div>
+
+              {/* Right Column: Prompt Details & Textarea Editor */}
+              {(() => {
+                const currentConfig =
+                  AI_PROMPT_CONFIG.find((c) => c.key === activePromptKey) ||
+                  AI_PROMPT_CONFIG[0];
+                const currentValue =
+                  promptState[currentConfig.key] !== undefined
+                    ? promptState[currentConfig.key] || ''
+                    : DEFAULT_AI_PROMPTS[currentConfig.key];
+                const isCustomized =
+                  currentValue.trim() !==
+                  DEFAULT_AI_PROMPTS[currentConfig.key].trim();
+                const wordCount = currentValue
+                  .trim()
+                  .split(/\s+/)
+                  .filter((w) => w.length > 0).length;
+                const charCount = currentValue.length;
+                const lineCount = currentValue.split('\n').length;
+
+                return (
+                  <div className="flex-1 p-4 overflow-y-auto flex flex-col space-y-3">
+                    {/* Prompt Header Card */}
+                    <div className="flex items-start justify-between gap-3 pb-3 border-b border-stone-800">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-stone-100 text-sm">
+                            {currentConfig.title}
+                          </h3>
+                          <span className="text-[10px] bg-stone-800 text-amber-400 px-2 py-0.5 rounded font-medium border border-stone-700">
+                            {currentConfig.category}
+                          </span>
+                        </div>
+                        <p className="text-stone-400 text-xs mt-1">
+                          {currentConfig.description}
+                        </p>
+                        <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-stone-400">
+                          <span className="font-medium text-stone-400">Where applied:</span>
+                          <span className="text-stone-300 font-mono bg-stone-950 px-1.5 py-0.5 rounded border border-stone-800">
+                            {currentConfig.appliedIn}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {isCustomized ? (
+                          <button
+                            type="button"
+                            onClick={() => handleResetPromptToDefault(currentConfig.key)}
+                            className="px-2.5 py-1 text-amber-300 hover:text-white bg-amber-950/60 hover:bg-amber-900 border border-amber-800/80 rounded text-[11px] font-medium flex items-center gap-1 transition-colors"
+                            title="Reset this prompt back to the factory default"
+                          >
+                            <RotateCcw className="w-3 h-3" /> Reset to Default
+                          </button>
+                        ) : (
+                          <span className="text-[10px] text-stone-400 bg-stone-950 px-2 py-1 rounded border border-stone-800">
+                            Using default prompt
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Editor Form */}
+                    <div className="flex-1 flex flex-col space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] text-stone-400">
+                        <label className="font-medium text-stone-300">
+                          System Prompt Instructions:
+                        </label>
+                        <span className="font-mono text-[10px]">
+                          {wordCount} words • {charCount} characters • {lineCount} lines
+                        </span>
+                      </div>
+
+                      <textarea
+                        value={currentValue}
+                        onChange={(e) => handlePromptChange(currentConfig.key, e.target.value)}
+                        placeholder={DEFAULT_AI_PROMPTS[currentConfig.key]}
+                        rows={10}
+                        className="w-full flex-1 min-h-[220px] bg-stone-950 border border-stone-800 rounded-lg p-3 text-stone-200 focus:outline-none focus:border-amber-500 font-mono text-xs leading-relaxed resize-y selection:bg-amber-600 selection:text-white"
+                        spellCheck={false}
+                      />
+                    </div>
+
+                    {/* Bottom Guidance Box */}
+                    <div className="p-3 bg-stone-950/70 border border-stone-800 rounded-lg text-stone-400 text-xs space-y-1">
+                      <div className="font-semibold text-stone-200 text-[11px] flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                        How StorySpark applies this prompt
+                      </div>
+                      <p className="text-[11px] leading-relaxed text-stone-400">
+                        When you invoke AI tools while working in{' '}
+                        <strong className="text-stone-300">
+                          "{targetPromptNovel?.title || 'this novel'}"
+                        </strong>
+                        , StorySpark passes your custom instructions above as the system-level directive to the model, ensuring tone, style rules, and narrative standards are adhered to faithfully.
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
           </div>
         )}
       </div>

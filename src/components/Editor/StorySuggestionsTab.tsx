@@ -29,6 +29,7 @@ interface StorySuggestionsTabProps {
   currentSceneSummary?: string;
   surroundingContext?: string;
   llmSettings?: LLMSettings;
+  customSystemPrompt?: string;
   onUseIdeaInGenerator: (promptGuidance: string) => void;
   onInsertContent: (text: string, mode: 'replace-or-cursor' | 'append') => void;
 }
@@ -58,6 +59,7 @@ export const StorySuggestionsTab: React.FC<StorySuggestionsTabProps> = ({
   currentSceneSummary = '',
   surroundingContext = '',
   llmSettings,
+  customSystemPrompt,
   onUseIdeaInGenerator,
   onInsertContent,
 }) => {
@@ -280,6 +282,7 @@ export const StorySuggestionsTab: React.FC<StorySuggestionsTabProps> = ({
           currentSceneTitle: currentSceneTitle || 'Current Scene',
           surroundingContext: surroundingContext || undefined,
           count: ideaCount,
+          systemPrompt: customSystemPrompt,
         },
         llmSettings
       );
