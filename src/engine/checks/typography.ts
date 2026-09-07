@@ -2,12 +2,16 @@ import { Suggestion } from '../../types/index.ts';
 
 /**
  * Deterministic typography checks:
- * 1. Straight double quotes ("...") -> Curly quotes (“...”)
- * 2. Straight single quotes/apostrophes ('...') -> Curly (‘...’)
- * 3. Double hyphens (--) -> Em-dash (—)
- * 4. Ellipsis triple dots (...) -> Proper ellipsis character (…)
- * 5. Multiple consecutive spaces (excluding indentation)
- * 6. Repeated punctuation like '??', '!!'
+ * 1. Multiple consecutive spaces
+ * 2. Standardize ellipses: "..." -> "…"
+ * 3. Standardize em-dashes: "--" or "---" -> "—"
+ * 4. Excessive punctuation: "??", "!!" -> single mark
+ * 5. Straight double quotes -> Curly double quotes “...”
+ * 6. Contraction straight apostrophes -> Typographic curly apostrophe ’ (e.g. don't -> don’t)
+ * 7. Space before punctuation (e.g. "word ," -> "word,")
+ * 8. Missing space after sentence punctuation (e.g. "sentence.Next" -> "sentence. Next")
+ * 9. Dialogue punctuation placement: period/comma outside closing quote (e.g. "hello". -> "hello.")
+ * 10. En-dash for number/year ranges: "1990-1995" -> "1990–1995"
  */
 export function checkTypography(text: string): Suggestion[] {
   const suggestions: Suggestion[] = [];
@@ -54,7 +58,7 @@ export function checkTypography(text: string): Suggestion[] {
     const lineStart = text.lastIndexOf('\n', match.index) + 1;
     const lineEnd = text.indexOf('\n', match.index);
     const line = text.slice(lineStart, lineEnd === -1 ? text.length : lineEnd).trim();
-    if (line === '---' || line === '---') {
+    if (line === '---' || line === '----') {
       continue;
     }
 
@@ -101,6 +105,106 @@ export function checkTypography(text: string): Suggestion[] {
       description: 'Convert straight quotes to typographic curly quotes: "text" -> “text”.',
       originalText: full,
       replacementText: `“${inner}”`,
+      startIndex: match.index,
+      endIndex: match.index + full.length,
+      ruleCategory: 'typography',
+      severity: 'suggestion',
+    });
+  }
+
+  // 6. Contraction straight apostrophes -> Typographic curly apostrophe (’)
+  const contractionRegex = /\b([a-zA-Z]+)'([a-zA-Z]+)\b/g;
+  while ((match = contractionRegex.exec(text)) !== null) {
+    const full = match[0];
+    const replacement = `${match[1]}’${match[2]}`;
+    suggestions.push({
+      id: `typo-apostrophe-${match.index}`,
+      type: 'typography',
+      title: 'Curly contraction apostrophe',
+      description: `Standardize straight apostrophe in "${full}" to typographic curly apostrophe "${replacement}".`,
+      originalText: full,
+      replacementText: replacement,
+      startIndex: match.index,
+      endIndex: match.index + full.length,
+      ruleCategory: 'typography',
+      severity: 'suggestion',
+    });
+  }
+
+  // 7. Errant space before punctuation mark: "word ," or "sentence ."
+  const spaceBeforePunctRegex = /\b([a-zA-Z0-9]+)\s+([,.:;?!])/g;
+  while ((match = spaceBeforePunctRegex.exec(text)) !== null) {
+    const full = match[0];
+    const word = match[1];
+    const punct = match[2];
+    suggestions.push({
+      id: `typo-space-before-${match.index}`,
+      type: 'typography',
+      title: `Unwanted space before "${punct}"`,
+      description: `Remove the space before the punctuation mark.`,
+      originalText: full,
+      replacementText: `${word}${punct}`,
+      startIndex: match.index,
+      endIndex: match.index + full.length,
+      ruleCategory: 'typography',
+      severity: 'suggestion',
+    });
+  }
+
+  // 8. Missing space after sentence punctuation (e.g. "word.Another")
+  const missingSpaceRegex = /([a-zA-Z]{2,})([.?!])([A-Z][a-zA-Z]+)/g;
+  while ((match = missingSpaceRegex.exec(text)) !== null) {
+    const full = match[0];
+    const firstWord = match[1];
+    const punct = match[2];
+    const secondWord = match[3];
+    suggestions.push({
+      id: `typo-space-after-${match.index}`,
+      type: 'typography',
+      title: 'Missing space after punctuation',
+      description: 'Insert a space after the sentence-ending punctuation.',
+      originalText: full,
+      replacementText: `${firstWord}${punct} ${secondWord}`,
+      startIndex: match.index,
+      endIndex: match.index + full.length,
+      ruleCategory: 'typography',
+      severity: 'suggestion',
+    });
+  }
+
+  // 9. Punctuation placed outside closing quotation mark: "word". or "word",
+  const punctOutsideQuoteRegex = /"([^"\n]+)"([,.])/g;
+  while ((match = punctOutsideQuoteRegex.exec(text)) !== null) {
+    const full = match[0];
+    const dialogue = match[1];
+    const punct = match[2];
+    suggestions.push({
+      id: `typo-quote-punct-${match.index}`,
+      type: 'typography',
+      title: 'Dialogue punctuation placement',
+      description: 'Standard fiction typography places periods and commas inside closing quotation marks.',
+      originalText: full,
+      replacementText: `"${dialogue}${punct}"`,
+      startIndex: match.index,
+      endIndex: match.index + full.length,
+      ruleCategory: 'typography',
+      severity: 'suggestion',
+    });
+  }
+
+  // 10. En-dash for number/year ranges: "1990-1995" -> "1990–1995"
+  const numberRangeRegex = /\b(\d{2,4})\s*-\s*(\d{2,4})\b/g;
+  while ((match = numberRangeRegex.exec(text)) !== null) {
+    const full = match[0];
+    const startNum = match[1];
+    const endNum = match[2];
+    suggestions.push({
+      id: `typo-endash-${match.index}`,
+      type: 'typography',
+      title: 'Number range en-dash',
+      description: 'Use an en-dash (–) rather than a hyphen (-) for date or numerical ranges.',
+      originalText: full,
+      replacementText: `${startNum}–${endNum}`,
       startIndex: match.index,
       endIndex: match.index + full.length,
       ruleCategory: 'typography',

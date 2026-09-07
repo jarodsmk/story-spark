@@ -7,7 +7,8 @@ export function useManuscriptActions(
   activeFileName: string,
   editorContent: string,
   sceneFiles: FileItem[],
-  bibleFiles: FileItem[]
+  bibleFiles: FileItem[],
+  novelTitle: string = 'Novel'
 ) {
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [compiledPreview, setCompiledPreview] = useState('');
@@ -38,5 +39,5 @@ export function useManuscriptActions(
     setIsExportOpen(true);
   }, [sceneFiles, bibleFiles]);
 
-  return { isExportOpen, setIsExportOpen, compiledPreview, handleExport, handleCompile };
+  return { isExportOpen, setIsExportOpen, compiledPreview, handleExport, handleCompile, novelTitle };
 }

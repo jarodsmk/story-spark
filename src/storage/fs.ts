@@ -7,6 +7,18 @@ export interface FileItem {
   size: number;
 }
 
+export const DEFAULT_STARTER_FILES: Record<string, string> = {
+  'scenes/01-prologue.md': `# Prologue: The Whisper of Ash\n\nThe sky above the port was the color of television, tuned to a dead channel. It had been raining for three days straight, and the old stone piers were slick as oiled slate.\n\n[Kaelen](bible/characters/kaelen.md) pulled his wool coat tighter around his shivering shoulders. He had had enough of cold harbors and whispered promises from men who never kept their word. The letter was crumpled in his damp pocket, its wax seal cracked and broken.\n\n"Are you waiting for the [midnight cutter](bible/world/midnight-cutter.md)?" a voice rasped from the fog behind him.\n\nHe turned slowly. A woman with silver hair stood beneath the broken streetlamp.\n\n"I was told the courier would be alone," Kaelen whispered.\n\nShe laughed quietly. "In this city, boy, no one is ever truly alone."`,
+  'scenes/02-the-lower-docks.md': `# Chapter 1: The Lower Docks\n\nThe tavern smelled of sour ale, wet dog, and burnt tallow candles. [Kaelen](bible/characters/kaelen.md) slipped into the booth farthest from the guttering hearth, keeping his back firmly pressed against the timber wall.\n\nAcross the room, sailors from the southern archipelago were drinking heavily and arguing over the price of salt.`,
+  'bible/characters/kaelen.md': `# Character: Kaelen Vance\n\n- **Role**: Protagonist / Reluctant Scout\n- **Age**: 24\n- **Appearance**: Tall, lean, weathered hands, dark hair cropped short.\n- **Goal**: Deliver the encrypted atlas before the Grand Inquisitor seals the gates.`,
+  'bible/world/midnight-cutter.md': `# World: The Midnight Cutter\n\n- **Type**: Vessel / Smuggling Ketch\n- **Atmosphere**: Black-hulled, muffled oarlocks, runs the fog line without imperial signal lights.\n- **Significance**: The sole clandestine escape craft ferrying refugees past the harbor blockades.`,
+  'novels/neon-horizon/scenes/01-signal-in-the-rain.md': `# Chapter 1: Signal in the Rain\n\nThe neon glyphs of [District 9](novels/neon-horizon/bible/world/district-9.md) bled across the cracked acrylic pavement. [Mara](novels/neon-horizon/bible/characters/mara.md) adjusted her ocular filter, cutting through the chromatic glare of the orbital transport billboards.\n\nThe package in her trench coat buzzed with a low harmonic frequency—unregistered biocoding from the offshore labs.\n\n"Mara, you're being pinged on the secondary band," Jax warned through her auditory implant, his synthesized cadence ragged with interference.\n\n"I see them," she whispered, stepping beneath the dripping overhang of an abandoned ramen cart.`,
+  'novels/neon-horizon/scenes/02-orbital-transfer.md': `# Chapter 2: Orbital Transfer\n\nThe mag-lev terminal vibrated beneath her boots. Across the departure concourse, corporate peacekeepers in matte-black armor were scanning retinal IDs.\n\nMara kept her chin down, her synthetic left iris calibrated to mimic standard civilian reflectance.`,
+  'novels/neon-horizon/bible/characters/mara.md': `# Character: Mara Lin\n\n- **Role**: Data courier & rogue cybernetics technician\n- **Age**: 28\n- **Appearance**: Synthetic iris on the left eye, frayed trench coat, neural shunt port behind ear.\n- **Goal**: Deliver the unregistered biocoding package before the corporate bounty hunters triangulate her signal.`,
+  'novels/neon-horizon/bible/world/district-9.md': `# World: District 9 (The Lower Sump)\n\n- **Atmosphere**: Drenched in perpetual acidic drizzle and holographic neon reflections.\n- **Key Locations**: The Orbital Transfer Spire, Old Acrylic Market, Sub-level 4 coolant tunnels.`,
+  'novels/neon-horizon/scenes/01-chapter-1.md': `# Chapter 1: Signal in the Rain\n\nThe neon glyphs of [District 9](novels/neon-horizon/bible/world/district-9.md) bled across the cracked acrylic pavement. [Mara](novels/neon-horizon/bible/characters/mara.md) adjusted her ocular filter, cutting through the chromatic glare of the orbital transport billboards.\n\nThe package in her trench coat buzzed with a low harmonic frequency—unregistered biocoding from the offshore labs.\n\n"Mara, you're being pinged on the secondary band," Jax warned through her auditory implant, his synthesized cadence ragged with interference.\n\n"I see them," she whispered, stepping beneath the dripping overhang of an abandoned ramen cart.`,
+};
+
 class LocalFilesystem {
   private isTauri: boolean;
   private memoryStore: Map<string, string> = new Map();
@@ -14,38 +26,37 @@ class LocalFilesystem {
 
   constructor() {
     this.isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-    this.apiBaseUrl = import.meta.env?.VITE_API_BASE_URL || 'http://localhost:3001';
+    this.apiBaseUrl = import.meta.env?.VITE_API_BASE_URL ?? '';
     this.initDefaultProject();
   }
 
   private initDefaultProject() {
+    // 1. Preload defaults into memory store
+    for (const [k, v] of Object.entries(DEFAULT_STARTER_FILES)) {
+      this.memoryStore.set(k, v);
+    }
+
+    // 2. Hydrate from localStorage backup if present
     const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('storyspark_fs_backup') : null;
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         for (const [k, v] of Object.entries(parsed)) {
-          this.memoryStore.set(k, v as string);
+          if (typeof v === 'string') {
+            this.memoryStore.set(k, v);
+          }
         }
-        return;
       } catch (e) {
         console.error('Failed to parse local backup', e);
       }
     }
 
-    this.memoryStore.set(
-      'scenes/01-prologue.md',
-      `# Prologue: The Whisper of Ash\n\nThe sky above the port was the color of television, tuned to a dead channel. It had been raining for three days straight, and the the old stone piers were slick as oiled slate.\n\nKaelen pulled his wool coat tighter around his shivering shoulders. He had had enough of cold harbors and whispered promises from men who never kept their word. The letter was was crumpled in his damp pocket, its wax seal cracked and broken.\n\n"Are you waiting for the midnight cutter?" a voice rasped from the fog behind him.\n\nHe turned slowly. A woman with silver hair stood stood beneath the broken streetlamp.\n\n"I was told the courier would be alone," Kaelen whispered.\n\nShe laughed quietly. "In this city, boy, no one is ever truly alone."`
-    );
-
-    this.memoryStore.set(
-      'scenes/02-the-lower-docks.md',
-      `# Chapter 1: The Lower Docks\n\nThe tavern smelled of sour ale, wet dog, and burnt tallow candles. Kaelen slipped into the booth farthest from the guttering hearth, keeping his back firmly pressed against the timber wall.\n\nAcross the room, sailors from the southern archipelago were drinking heavily and arguing over the price of salt.`
-    );
-
-    this.memoryStore.set(
-      'bible/characters/kaelen.md',
-      `# Character: Kaelen Vance\n\n- **Role**: Protagonist / Reluctant Scout\n- **Age**: 24\n- **Appearance**: Tall, lean, weathered hands, dark hair cropped short.\n- **Goal**: Deliver the encrypted atlas before the Grand Inquisitor seals the gates.`
-    );
+    // 3. Guarantee any missing default starter files are preserved
+    for (const [k, v] of Object.entries(DEFAULT_STARTER_FILES)) {
+      if (!this.memoryStore.has(k)) {
+        this.memoryStore.set(k, v);
+      }
+    }
 
     this.persistStore();
   }
@@ -87,8 +98,14 @@ class LocalFilesystem {
       // Offline fallback
     }
 
-    const content = this.memoryStore.get(relativePath);
+    let content = this.memoryStore.get(relativePath);
     if (content === undefined) {
+      if (DEFAULT_STARTER_FILES[relativePath]) {
+        content = DEFAULT_STARTER_FILES[relativePath];
+        this.memoryStore.set(relativePath, content);
+        this.persistStore();
+        return content;
+      }
       throw new Error(`File not found: ${relativePath}`);
     }
     return content;
@@ -221,12 +238,31 @@ class LocalFilesystem {
     return res;
   }
 
+  async deleteDirectory(prefix: string): Promise<void> {
+    const cleanPrefix = prefix.endsWith('/') ? prefix : `${prefix}/`;
+    const filesToDelete: string[] = [];
+    for (const p of this.memoryStore.keys()) {
+      if (p.startsWith(cleanPrefix)) {
+        filesToDelete.push(p);
+      }
+    }
+    for (const f of filesToDelete) {
+      await this.deleteFile(f);
+    }
+  }
+
   getAllFiles(): Record<string, string> {
     const obj: Record<string, string> = {};
     for (const [k, v] of this.memoryStore.entries()) {
       obj[k] = v;
     }
     return obj;
+  }
+
+  clear(): void {
+    this.memoryStore.clear();
+    this.initDefaultProject();
+    this.persistStore();
   }
 }
 

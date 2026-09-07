@@ -1,4 +1,4 @@
-import { UserRule, IgnoredTerm, RecentDocument } from '../types/index.ts';
+import { UserRule, IgnoredTerm, RecentDocument, Novel } from '../types/index.ts';
 import { DEFAULT_USER_RULES } from '../engine/checks/index.ts';
 
 // Web LocalStorage / In-memory DB interface that mirrors SQLite schema
@@ -8,6 +8,29 @@ const RULES_KEY = 'storyspark_user_rules';
 const IGNORED_KEY = 'storyspark_ignored_terms';
 const RECENTS_KEY = 'storyspark_recent_docs';
 const LLM_SETTINGS_KEY = 'storyspark_llm_settings';
+const NOVELS_KEY = 'storyspark_novels';
+const ACTIVE_NOVEL_KEY = 'storyspark_active_novel_id';
+
+export const DEFAULT_NOVELS: Novel[] = [
+  {
+    id: 'default',
+    title: 'The Whisper of Ash',
+    genre: 'Dark Fantasy',
+    description: 'A courier attempts to smuggle an encrypted atlas out of a foggy, inquisitor-ruled port city.',
+    targetWordCount: 50000,
+    createdAt: 1700000000000,
+    updatedAt: 1700000000000,
+  },
+  {
+    id: 'neon-horizon',
+    title: 'Neon Horizon',
+    genre: 'Sci-Fi Cyberpunk',
+    description: 'A data courier with a synthetic ocular filter races against a biometric warrant in District 9.',
+    targetWordCount: 65000,
+    createdAt: 1700001000000,
+    updatedAt: 1700001000000,
+  },
+];
 
 export class LocalDatabase {
   private isTauri: boolean;
@@ -15,7 +38,7 @@ export class LocalDatabase {
 
   constructor() {
     this.isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-    this.apiBaseUrl = import.meta.env?.VITE_API_BASE_URL || 'http://localhost:3001';
+    this.apiBaseUrl = import.meta.env?.VITE_API_BASE_URL ?? '';
   }
 
   async init(): Promise<void> {
@@ -61,7 +84,18 @@ export class LocalDatabase {
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(RULES_KEY) : null;
     if (!raw) return DEFAULT_USER_RULES;
     try {
-      return JSON.parse(raw);
+      const saved: UserRule[] = JSON.parse(raw);
+      // Merge any new default rules seamlessly
+      const savedIds = new Set(saved.map((r) => r.id));
+      const missingDefaults = DEFAULT_USER_RULES.filter((r) => !savedIds.has(r.id));
+      if (missingDefaults.length > 0) {
+        const merged = [...saved, ...missingDefaults];
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(RULES_KEY, JSON.stringify(merged));
+        }
+        return merged;
+      }
+      return saved;
     } catch {
       return DEFAULT_USER_RULES;
     }
@@ -182,6 +216,55 @@ export class LocalDatabase {
       localStorage.setItem(LLM_SETTINGS_KEY, JSON.stringify(settings));
     }
     await this.saveSetting(LLM_SETTINGS_KEY, settings);
+  }
+
+  async getNovels(): Promise<Novel[]> {
+    const remote = await this.fetchSetting<Novel[]>(NOVELS_KEY);
+    if (remote && Array.isArray(remote) && remote.length > 0) {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(NOVELS_KEY, JSON.stringify(remote));
+      }
+      return remote;
+    }
+
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(NOVELS_KEY) : null;
+    if (!raw) return DEFAULT_NOVELS;
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+      return DEFAULT_NOVELS;
+    } catch {
+      return DEFAULT_NOVELS;
+    }
+  }
+
+  async saveNovels(novels: Novel[]): Promise<void> {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(NOVELS_KEY, JSON.stringify(novels));
+    }
+    await this.saveSetting(NOVELS_KEY, novels);
+  }
+
+  async getActiveNovelId(): Promise<string> {
+    const remote = await this.fetchSetting<{ activeId: string }>(ACTIVE_NOVEL_KEY);
+    if (remote?.activeId) {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(ACTIVE_NOVEL_KEY, remote.activeId);
+      }
+      return remote.activeId;
+    }
+
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(ACTIVE_NOVEL_KEY) : null;
+    return raw || 'default';
+  }
+
+  async setActiveNovelId(id: string): Promise<void> {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(ACTIVE_NOVEL_KEY, id);
+    }
+    await this.saveSetting(ACTIVE_NOVEL_KEY, { activeId: id });
   }
 }
 

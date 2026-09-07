@@ -1,21 +1,25 @@
 import React, { useState } from 'react';
 import { X, BookCheck, Download } from 'lucide-react';
+import { sanitizeFilename } from '../../engine/markdown/index.ts';
 
 interface ExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   compiledMarkdown: string;
+  novelTitle?: string;
 }
 
 export const ExportModal: React.FC<ExportModalProps> = ({
   isOpen,
   onClose,
   compiledMarkdown,
+  novelTitle = 'Novel',
 }) => {
   if (!isOpen) return null;
 
   const downloadFile = (format: 'markdown' | 'text') => {
-    const filename = `StorySpark-Novel-Manuscript.${format === 'markdown' ? 'md' : 'txt'}`;
+    const cleanTitle = sanitizeFilename(novelTitle.replace(/\s+/g, '-')) || 'StorySpark-Novel';
+    const filename = `${cleanTitle}-Manuscript.${format === 'markdown' ? 'md' : 'txt'}`;
     const blob = new Blob([compiledMarkdown], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -33,7 +37,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         <div className="h-11 border-b border-stone-800 px-4 flex items-center justify-between">
           <div className="flex items-center space-x-2 font-medium text-stone-200">
             <BookCheck className="w-4 h-4 text-amber-500" />
-            <span>Compiled Novel Manuscript Preview</span>
+            <span>Compiled Manuscript Preview: <strong className="text-amber-400 font-semibold">{novelTitle}</strong></span>
           </div>
           <button onClick={onClose} className="text-stone-400 hover:text-white"><X className="w-4 h-4" /></button>
         </div>

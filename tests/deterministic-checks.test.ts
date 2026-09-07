@@ -3,6 +3,10 @@ import { checkRepeatedWords } from '../src/engine/checks/repeatedWords.ts';
 import { checkSentenceLength } from '../src/engine/checks/sentenceLength.ts';
 import { checkPassiveVoice } from '../src/engine/checks/passiveVoice.ts';
 import { checkTypography } from '../src/engine/checks/typography.ts';
+import { checkGrammarConfusions } from '../src/engine/checks/grammarConfusions.ts';
+import { checkArticleAgreement } from '../src/engine/checks/articleAgreement.ts';
+import { checkFilterWords } from '../src/engine/checks/filterWords.ts';
+import { checkWeakWords, checkRedundantAdverbs, checkCliches } from '../src/engine/checks/styleCraft.ts';
 import { runAllChecks, DEFAULT_USER_RULES } from '../src/engine/checks/index.ts';
 
 describe('Deterministic Writing Checks', () => {
@@ -57,11 +61,90 @@ describe('Deterministic Writing Checks', () => {
     });
   });
 
+  describe('checkGrammarConfusions', () => {
+    it('detects could of / should of / would of', () => {
+      const text = 'He could of spoken up sooner.';
+      const res = checkGrammarConfusions(text);
+      expect(res.some((r) => r.originalText === 'could of' && r.replacementText === 'could have')).toBe(true);
+    });
+
+    it('detects comparative then vs than', () => {
+      const text = 'She was faster then the hound.';
+      const res = checkGrammarConfusions(text);
+      expect(res.some((r) => r.originalText === 'faster then' && r.replacementText === 'faster than')).toBe(true);
+    });
+
+    it('detects loose vs lose', () => {
+      const text = 'He did not want to loose his temper.';
+      const res = checkGrammarConfusions(text);
+      expect(res.some((r) => r.originalText.includes('loose his') || r.originalText.includes('to loose'))).toBe(true);
+    });
+
+    it('detects its vs it\'s errors', () => {
+      const text = 'Its a dangerous journey, but the hound wagged it\'s tail.';
+      const res = checkGrammarConfusions(text);
+      expect(res.some((r) => r.originalText === 'Its a' && r.replacementText === "It's a")).toBe(true);
+      expect(res.some((r) => r.originalText === "it's tail" && r.replacementText === 'its tail')).toBe(true);
+    });
+
+    it('detects idioms: bated breath and piqued interest', () => {
+      const text = 'They waited with baited breath until the strange artifact peaked his curiosity.';
+      const res = checkGrammarConfusions(text);
+      expect(res.some((r) => r.originalText === 'baited breath')).toBe(true);
+      expect(res.some((r) => r.originalText.includes('peaked his curiosity'))).toBe(true);
+    });
+  });
+
+  describe('checkArticleAgreement', () => {
+    it('detects "a" before vowel sound and "an" before consonant sound', () => {
+      const text = 'He found a apple and an sword, and waited a hour at a university.';
+      const res = checkArticleAgreement(text);
+      expect(res.some((r) => r.originalText === 'a apple' && r.replacementText === 'an apple')).toBe(true);
+      expect(res.some((r) => r.originalText === 'an sword' && r.replacementText === 'a sword')).toBe(true);
+      expect(res.some((r) => r.originalText === 'a hour' && r.replacementText === 'an hour')).toBe(true);
+      // "a university" starts with 'yu' consonant sound - should not flag as error
+      expect(res.some((r) => r.originalText === 'a university')).toBe(false);
+    });
+  });
+
+  describe('checkFilterWords', () => {
+    it('detects sensory filtering verbs in narrative prose', () => {
+      const text = 'She heard the church bell chime, and he watched as the ship departed.';
+      const res = checkFilterWords(text);
+      expect(res.length).toBeGreaterThanOrEqual(2);
+      expect(res.some((r) => r.type === 'filter-word' && r.originalText.includes('heard'))).toBe(true);
+      expect(res.some((r) => r.type === 'filter-word' && r.originalText.includes('watched as'))).toBe(true);
+    });
+  });
+
+  describe('checkWeakWords, checkRedundantAdverbs, and checkCliches', () => {
+    it('detects suddenly and inceptive crutches', () => {
+      const text = 'Suddenly the door burst open and he started to run.';
+      const res = checkWeakWords(text);
+      expect(res.some((r) => r.originalText === 'Suddenly')).toBe(true);
+      expect(res.some((r) => r.originalText.includes('started to run'))).toBe(true);
+    });
+
+    it('detects redundant body language and adverbs', () => {
+      const text = 'She whispered quietly and nodded her head in silence.';
+      const res = checkRedundantAdverbs(text);
+      expect(res.some((r) => r.originalText === 'whispered quietly' && r.replacementText === 'whispered')).toBe(true);
+      expect(res.some((r) => r.originalText === 'nodded her head' && r.replacementText === 'nodded')).toBe(true);
+    });
+
+    it('detects overused fiction clichés', () => {
+      const text = 'His heart skipped a beat on that dark and stormy night.';
+      const res = checkCliches(text);
+      expect(res.some((r) => r.originalText === 'heart skipped a beat')).toBe(true);
+      expect(res.some((r) => r.originalText === 'dark and stormy')).toBe(true);
+    });
+  });
+
   describe('checkTypography', () => {
     it('detects straight quotes and proposes curly quotes', () => {
       const text = '"Are you waiting for the cutter?"';
       const res = checkTypography(text);
-      const quoteIssue = res.find(r => r.id.includes('quotes'));
+      const quoteIssue = res.find((r) => r.id.includes('quotes'));
       expect(quoteIssue).toBeDefined();
       expect(quoteIssue?.replacementText).toBe('“Are you waiting for the cutter?”');
     });
@@ -69,19 +152,27 @@ describe('Deterministic Writing Checks', () => {
     it('detects triple dots and double hyphens', () => {
       const text = 'He hesitated... then said--nothing.';
       const res = checkTypography(text);
-      const ellipsisIssue = res.find(r => r.id.includes('ellipsis'));
-      const emDashIssue = res.find(r => r.id.includes('emdash'));
+      const ellipsisIssue = res.find((r) => r.id.includes('ellipsis'));
+      const emDashIssue = res.find((r) => r.id.includes('emdash'));
 
       expect(ellipsisIssue?.replacementText).toBe('…');
       expect(emDashIssue?.replacementText).toBe('—');
+    });
+
+    it('standardizes contraction apostrophes, spacing, and dialogue punctuation', () => {
+      const text = "He don't know .She said \"Stop\".";
+      const res = checkTypography(text);
+      expect(res.some((r) => r.originalText === "don't" && r.replacementText === 'don’t')).toBe(true);
+      expect(res.some((r) => r.originalText === 'know .' && r.replacementText === 'know.')).toBe(true);
+      expect(res.some((r) => r.originalText === '"Stop".' && r.replacementText === '"Stop."')).toBe(true);
     });
   });
 
   describe('runAllChecks integration', () => {
     it('runs all active rules together and sorts by position', () => {
-      const sample = 'The the door was opened...';
+      const sample = 'The the door was opened... Suddenly she heard a apple fall.';
       const results = runAllChecks(sample, DEFAULT_USER_RULES, new Set());
-      expect(results.length).toBeGreaterThanOrEqual(3);
+      expect(results.length).toBeGreaterThanOrEqual(4);
       expect(results[0].startIndex).toBeLessThanOrEqual(results[1].startIndex);
     });
   });

@@ -1,6 +1,16 @@
 export interface Suggestion {
   id: string;
-  type: 'repeated-word' | 'sentence-length' | 'passive-voice' | 'typography' | 'ai-rewrite';
+  type:
+    | 'repeated-word'
+    | 'sentence-length'
+    | 'passive-voice'
+    | 'typography'
+    | 'ai-rewrite'
+    | 'grammar'
+    | 'filter-word'
+    | 'weak-word'
+    | 'redundant-adverb'
+    | 'cliche';
   title: string;
   description: string;
   originalText: string;
@@ -14,7 +24,17 @@ export interface Suggestion {
 export interface UserRule {
   id: string;
   name: string;
-  category: 'repeated-word' | 'sentence-length' | 'passive-voice' | 'typography';
+  category:
+    | 'repeated-word'
+    | 'sentence-length'
+    | 'passive-voice'
+    | 'typography'
+    | 'grammar-confusions'
+    | 'article-agreement'
+    | 'filter-words'
+    | 'weak-words'
+    | 'redundant-adverbs'
+    | 'cliches';
   enabled: boolean;
   threshold?: number;
   description: string;
@@ -51,6 +71,16 @@ export interface SceneDocument {
   order: number;
   chapter?: string;
   synopsis?: string;
+}
+
+export interface Novel {
+  id: string;
+  title: string;
+  description?: string;
+  genre?: string;
+  targetWordCount?: number;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface LLMSettings {

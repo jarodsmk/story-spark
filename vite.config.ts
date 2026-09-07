@@ -6,8 +6,8 @@ export default defineConfig({
   plugins: [react()],
   clearScreen: false,
   server: {
-    port: 1420,
-    strictPort: true,
+    host: '0.0.0.0',
+    port: 3000,
   },
   envPrefix: ['VITE_', 'TAURI_'],
   test: {
