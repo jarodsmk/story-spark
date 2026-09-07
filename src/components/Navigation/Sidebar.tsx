@@ -17,6 +17,7 @@ import {
   Camera,
   PanelLeftClose,
   PanelLeftOpen,
+  Lightbulb,
 } from 'lucide-react';
 import { FileItem } from '../../storage/fs.ts';
 import { Novel, SceneSummary } from '../../types/index.ts';
@@ -24,10 +25,12 @@ import { Novel, SceneSummary } from '../../types/index.ts';
 interface SidebarProps {
   sceneFiles: FileItem[];
   bibleFiles: FileItem[];
+  scratchpadFiles?: FileItem[];
   activeFilePath: string;
   onSelectFile: (path: string) => void;
   onNewScene: () => void;
   onNewBibleEntry: (type: 'character' | 'world') => void;
+  onNewScratchpadIdea?: () => void;
   onDeleteFile: (path: string) => void;
   onOpenSettings: () => void;
   onImportFile: () => void;
@@ -47,10 +50,12 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({
   sceneFiles,
   bibleFiles,
+  scratchpadFiles = [],
   activeFilePath,
   onSelectFile,
   onNewScene,
   onNewBibleEntry,
+  onNewScratchpadIdea,
   onDeleteFile,
   onOpenSettings,
   onImportFile,
@@ -139,6 +144,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className="p-2 text-stone-400 hover:text-white hover:bg-stone-900 rounded transition-colors"
           >
             <FilePlus className="w-4 h-4" />
+          </button>
+
+          {/* Quick Scratchpad Action */}
+          <button
+            type="button"
+            id="sidebar-collapsed-scratchpad-btn"
+            onClick={scratchpadFiles.length > 0 ? () => onSelectFile(scratchpadFiles[0].path) : onNewScratchpadIdea}
+            title={`Scratchpad Ideas (${scratchpadFiles.length}) - Click to view or jot idea`}
+            className="p-2 text-purple-400 hover:text-purple-300 hover:bg-stone-900 rounded transition-colors relative"
+          >
+            <Lightbulb className="w-4 h-4" />
+            {scratchpadFiles.length > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-purple-600 text-stone-100 rounded-full text-[9px] font-bold flex items-center justify-center">
+                {scratchpadFiles.length}
+              </span>
+            )}
           </button>
 
           {/* Scene Summaries Button */}
@@ -548,6 +569,72 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             </div>
           ))}
+        </div>
+
+        {/* Scratchpad */}
+        <div id="sidebar-scratchpad-section">
+          <div className="flex items-center justify-between px-1 mb-1 text-stone-400">
+            <span className="flex items-center gap-1 font-medium text-[10px] uppercase text-purple-300/90">
+              <Lightbulb className="w-3 h-3 text-purple-400" /> Scratchpad ({scratchpadFiles.length})
+            </span>
+            <button
+              type="button"
+              id="sidebar-new-scratchpad-idea-btn"
+              onClick={onNewScratchpadIdea}
+              title="New Scratchpad Idea (Ad-hoc note)"
+              className="p-0.5 hover:text-purple-300 text-stone-500 hover:bg-stone-900 rounded transition-colors"
+            >
+              <FilePlus className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {scratchpadFiles.length === 0 ? (
+            <button
+              type="button"
+              id="sidebar-empty-scratchpad-btn"
+              onClick={onNewScratchpadIdea}
+              className="w-full text-left px-2 py-1.5 rounded border border-dashed border-stone-800 hover:border-purple-600/60 text-[11px] text-stone-500 hover:text-purple-300 hover:bg-purple-950/20 transition-all flex items-center gap-1.5 group"
+            >
+              <Plus className="w-3 h-3 text-stone-600 group-hover:text-purple-400 flex-shrink-0" />
+              <span className="truncate">Jot down an ad-hoc idea...</span>
+            </button>
+          ) : (
+            scratchpadFiles.map(f => {
+              const isSelected = activeFilePath === f.path;
+              const displayName = f.name
+                .replace(/\.md$/, '')
+                .replace(/^idea-/, '')
+                .replace(/[-_]/g, ' ');
+
+              return (
+                <div
+                  key={f.path}
+                  onClick={() => onSelectFile(f.path)}
+                  className={`group flex items-center justify-between px-2 py-1 rounded cursor-pointer transition-colors ${
+                    isSelected
+                      ? 'bg-purple-950/60 text-purple-200 border border-purple-800/50 shadow-xs'
+                      : 'text-stone-400 hover:bg-stone-900'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 truncate flex-1 min-w-0 mr-1">
+                    <Lightbulb className={`w-3 h-3 flex-shrink-0 ${isSelected ? 'text-purple-300' : 'text-stone-600 group-hover:text-purple-400'}`} />
+                    <span className="truncate text-[11px]">{displayName}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteFile(f.path);
+                    }}
+                    title="Delete Idea"
+                    className="opacity-0 group-hover:opacity-100 text-stone-500 hover:text-rose-400 p-0.5 transition-colors"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Compass } from 'lucide-react';
+import { User, Compass, Lightbulb } from 'lucide-react';
 import { LoreEntry, findLoreReferences, LoreReferenceMatch } from '../../engine/lore/loreReference.ts';
 import { Suggestion } from '../../types/index.ts';
 
@@ -47,6 +47,7 @@ export const LoreTextRenderer: React.FC<LoreTextRendererProps> = ({
     }
 
     const isCharacter = ref.entry ? ref.entry.category === 'character' : ref.targetPath.includes('characters');
+    const isIdea = ref.entry ? ref.entry.category === 'idea' : (ref.targetPath.includes('scratchpad') || ref.targetPath.includes('ideas'));
 
     elements.push(
       <span
@@ -63,12 +64,20 @@ export const LoreTextRenderer: React.FC<LoreTextRendererProps> = ({
         className={`inline-flex items-center gap-0.5 px-1 py-0.5 rounded cursor-pointer transition-all border-b font-medium select-text ${
           isCharacter
             ? 'bg-amber-500/15 text-amber-200 border-amber-400/60 hover:bg-amber-500/25 hover:border-amber-300'
+            : isIdea
+            ? 'bg-purple-500/15 text-purple-200 border-purple-400/60 hover:bg-purple-500/25 hover:border-purple-300'
             : 'bg-cyan-500/15 text-cyan-200 border-cyan-400/60 hover:bg-cyan-500/25 hover:border-cyan-300'
         }`}
-        title={`Click to view ${ref.entry?.name || ref.anchorText} in Story Bible`}
+        title={
+          isIdea
+            ? `Click to reference & edit idea "${ref.entry?.name || ref.anchorText}" in Scratchpad`
+            : `Click to view ${ref.entry?.name || ref.anchorText} in Story Bible`
+        }
       >
         {isCharacter ? (
           <User className="w-3 h-3 text-amber-400/80 inline-block flex-shrink-0" />
+        ) : isIdea ? (
+          <Lightbulb className="w-3 h-3 text-purple-400/90 inline-block flex-shrink-0" />
         ) : (
           <Compass className="w-3 h-3 text-cyan-400/80 inline-block flex-shrink-0" />
         )}

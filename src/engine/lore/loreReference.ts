@@ -1,13 +1,13 @@
 import { sanitizeFilename } from '../markdown/index.ts';
 
 export interface LoreEntry {
-  id: string; // e.g. 'bible/characters/kaelen.md'
+  id: string; // e.g. 'bible/characters/kaelen.md' or 'scratchpad/magic-system.md'
   path: string; // full relative path
   filename: string; // 'kaelen.md'
   name: string; // 'Kaelen Vance'
-  category: 'character' | 'world' | 'lore';
+  category: 'character' | 'world' | 'lore' | 'idea';
   summary: string; // concise summary for tooltip
-  attributes: Record<string, string>; // parsed attributes e.g. { Role: '...', Appearance: '...' }
+  attributes: Record<string, string>; // parsed attributes e.g. { Role: '...', Appearance: '...', Status: '...' }
   rawContent: string;
 }
 
@@ -28,9 +28,11 @@ export function parseLoreMarkdown(path: string, content: string): LoreEntry {
   const filename = normalizedPath.split('/').pop() || path;
 
   // Determine category from path
-  let category: 'character' | 'world' | 'lore' = 'lore';
+  let category: 'character' | 'world' | 'lore' | 'idea' = 'lore';
   if (normalizedPath.includes('characters')) {
     category = 'character';
+  } else if (normalizedPath.includes('scratchpad') || normalizedPath.includes('ideas')) {
+    category = 'idea';
   } else if (normalizedPath.includes('world') || normalizedPath.includes('locations')) {
     category = 'world';
   }
@@ -47,10 +49,10 @@ export function parseLoreMarkdown(path: string, content: string): LoreEntry {
     const line = rawLine.trim();
     if (!line) continue;
 
-    // Check for Markdown H1: # Character: Name or # World: Name or # Name
+    // Check for Markdown H1: # Character: Name or # World: Name or # Idea: Name or # Name
     if (line.startsWith('#')) {
       const headingMatch = line.replace(/^#+\s*/, '');
-      const cleanHeading = headingMatch.replace(/^(character|world|lore|location):\s*/i, '').trim();
+      const cleanHeading = headingMatch.replace(/^(character|world|lore|location|idea|scratchpad):\s*/i, '').trim();
       if (cleanHeading) {
         name = cleanHeading;
       }
@@ -78,14 +80,21 @@ export function parseLoreMarkdown(path: string, content: string): LoreEntry {
     summary += `Role: ${attributes['Role']}`;
   } else if (attributes['Atmosphere']) {
     summary += `Atmosphere: ${attributes['Atmosphere']}`;
+  } else if (attributes['Status']) {
+    summary += `Status: ${attributes['Status']}`;
   } else if (attributes['Type']) {
     summary += `Type: ${attributes['Type']}`;
   }
 
+  if (attributes['Tags']) {
+    summary += summary ? ` • Tags: ${attributes['Tags']}` : `Tags: ${attributes['Tags']}`;
+  }
   if (attributes['Appearance']) {
     summary += summary ? ` • ${attributes['Appearance']}` : attributes['Appearance'];
   } else if (attributes['Goal']) {
     summary += summary ? ` • Goal: ${attributes['Goal']}` : `Goal: ${attributes['Goal']}`;
+  } else if (attributes['Summary']) {
+    summary += summary ? ` • ${attributes['Summary']}` : attributes['Summary'];
   } else if (attributes['Significance']) {
     summary += summary ? ` • ${attributes['Significance']}` : attributes['Significance'];
   }
@@ -95,7 +104,9 @@ export function parseLoreMarkdown(path: string, content: string): LoreEntry {
   }
 
   if (!summary) {
-    summary = `${category === 'character' ? 'Character' : 'Lore'} entry in Story Bible.`;
+    summary = category === 'idea'
+      ? 'Ad-hoc idea stored in Scratchpad.'
+      : `${category === 'character' ? 'Character' : 'Lore'} entry in Story Bible.`;
   }
 
   return {
@@ -118,6 +129,8 @@ export function normalizeLorePath(p: string): string {
     .replace(/\\/g, '/')
     .replace(/^lore:\/?\/?/i, '')
     .replace(/^character:\/?\/?/i, '')
+    .replace(/^idea:\/?\/?/i, '')
+    .replace(/^scratchpad:\/?\/?/i, '')
     .replace(/^@/, '')
     .toLowerCase()
     .trim();
@@ -185,15 +198,20 @@ export function findLoreReferences(
     const startIndex = match.index;
     const endIndex = startIndex + raw.length;
 
-    // Determine if this target points to lore/character
+    // Determine if this target points to lore/character/scratchpad
     const isExplicitLore =
       targetPath.includes('bible/') ||
+      targetPath.includes('scratchpad/') ||
+      targetPath.includes('ideas/') ||
       targetPath.startsWith('lore:') ||
       targetPath.startsWith('character:') ||
+      targetPath.startsWith('idea:') ||
+      targetPath.startsWith('scratchpad:') ||
       targetPath.startsWith('@') ||
       targetPath.includes('/characters/') ||
       targetPath.includes('/world/') ||
-      targetPath.includes('/lore/');
+      targetPath.includes('/lore/') ||
+      targetPath.includes('/scratchpad/');
 
     const matchedEntry = findMatchingLoreEntry(targetPath, entryList);
 

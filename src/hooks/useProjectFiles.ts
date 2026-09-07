@@ -5,6 +5,7 @@ import { sanitizeFilename } from '../engine/markdown/index.ts';
 export function useProjectFiles(activeNovelId: string = 'default') {
   const [sceneFiles, setSceneFiles] = useState<FileItem[]>([]);
   const [bibleFiles, setBibleFiles] = useState<FileItem[]>([]);
+  const [scratchpadFiles, setScratchpadFiles] = useState<FileItem[]>([]);
   const [activeFilePath, setActiveFilePath] = useState<string>('scenes/01-prologue.md');
   const [activeFileName, setActiveFileName] = useState<string>('01-prologue.md');
 
@@ -14,23 +15,27 @@ export function useProjectFiles(activeNovelId: string = 'default') {
         scenesDir: 'scenes',
         bibleCharsDir: 'bible/characters',
         bibleWorldDir: 'bible/world',
+        scratchpadDir: 'scratchpad',
       };
     }
     return {
       scenesDir: `novels/${novelId}/scenes`,
       bibleCharsDir: `novels/${novelId}/bible/characters`,
       bibleWorldDir: `novels/${novelId}/bible/world`,
+      scratchpadDir: `novels/${novelId}/scratchpad`,
     };
   };
 
   const refreshFileList = async (targetNovelId: string = activeNovelId) => {
-    const { scenesDir, bibleCharsDir, bibleWorldDir } = getPaths(targetNovelId);
+    const { scenesDir, bibleCharsDir, bibleWorldDir, scratchpadDir } = getPaths(targetNovelId);
     const scenes = await fs.listFiles(scenesDir);
     const bibleChars = await fs.listFiles(bibleCharsDir);
     const bibleWorld = await fs.listFiles(bibleWorldDir);
+    const scratchpad = await fs.listFiles(scratchpadDir);
     setSceneFiles(scenes);
     setBibleFiles([...bibleChars, ...bibleWorld]);
-    return { scenes, bible: [...bibleChars, ...bibleWorld] };
+    setScratchpadFiles(scratchpad);
+    return { scenes, bible: [...bibleChars, ...bibleWorld], scratchpad };
   };
 
   useEffect(() => {
@@ -88,6 +93,16 @@ export function useProjectFiles(activeNovelId: string = 'default') {
     return path;
   };
 
+  const createScratchpadIdea = async (title: string, initialContent?: string): Promise<string> => {
+    const clean = sanitizeFilename(title.toLowerCase());
+    const { scratchpadDir } = getPaths(activeNovelId);
+    const path = `${scratchpadDir}/${clean}.md`;
+    const content = initialContent ?? `# Idea: ${title}\n\n- **Status**: Rough Concept\n- **Summary**: Ad-hoc idea for reference and exploration.\n\nWrite down quick thoughts, plot hooks, research notes, or dialogue ideas...\n`;
+    await fs.writeFile(path, content);
+    await refreshFileList();
+    return path;
+  };
+
   const deleteFile = async (path: string) => {
     await fs.deleteFile(path);
     await refreshFileList();
@@ -110,6 +125,7 @@ export function useProjectFiles(activeNovelId: string = 'default') {
   return {
     sceneFiles,
     bibleFiles,
+    scratchpadFiles,
     activeFilePath,
     setActiveFilePath,
     activeFileName,
@@ -117,6 +133,7 @@ export function useProjectFiles(activeNovelId: string = 'default') {
     refreshFileList,
     createScene,
     createBibleEntry,
+    createScratchpadIdea,
     deleteFile,
     getTotalWordCount,
   };

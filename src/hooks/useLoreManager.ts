@@ -10,22 +10,27 @@ import {
   unlinkLoreReference,
 } from '../engine/lore/loreReference.ts';
 
-export function useLoreManager(activeNovelId: string = 'default', bibleFiles: FileItem[] = []) {
+export function useLoreManager(
+  activeNovelId: string = 'default',
+  bibleFiles: FileItem[] = [],
+  scratchpadFiles: FileItem[] = []
+) {
   const [entries, setEntries] = useState<LoreEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Load and parse all bible files into LoreEntry objects
+  // Load and parse all bible and scratchpad files into LoreEntry objects
   const loadLoreEntries = useCallback(async () => {
     setIsLoading(true);
     try {
       const loaded: LoreEntry[] = [];
-      for (const file of bibleFiles) {
+      const allFiles = [...bibleFiles, ...scratchpadFiles];
+      for (const file of allFiles) {
         try {
           const content = await fs.readFile(file.path);
           const parsed = parseLoreMarkdown(file.path, content);
           loaded.push(parsed);
         } catch (e) {
-          console.warn('Could not read bible file:', file.path, e);
+          console.warn('Could not read lore/scratchpad file:', file.path, e);
         }
       }
       setEntries(loaded);
@@ -34,7 +39,7 @@ export function useLoreManager(activeNovelId: string = 'default', bibleFiles: Fi
     } finally {
       setIsLoading(false);
     }
-  }, [bibleFiles]);
+  }, [bibleFiles, scratchpadFiles]);
 
   useEffect(() => {
     loadLoreEntries();
@@ -50,6 +55,11 @@ export function useLoreManager(activeNovelId: string = 'default', bibleFiles: Fi
     [entries]
   );
 
+  const ideas = useMemo(
+    () => entries.filter((e) => e.category === 'idea'),
+    [entries]
+  );
+
   const entriesMap = useMemo(() => {
     const map = new Map<string, LoreEntry>();
     for (const e of entries) {
@@ -60,28 +70,43 @@ export function useLoreManager(activeNovelId: string = 'default', bibleFiles: Fi
     return map;
   }, [entries]);
 
-  // Create a new lore entry file and return its path
+  // Create a new lore or scratchpad entry file and return its path
   const createLoreEntry = useCallback(
     async (
       name: string,
-      category: 'character' | 'world',
+      category: 'character' | 'world' | 'idea',
       details: { roleOrAtmosphere: string; summary: string }
     ): Promise<LoreEntry> => {
       const slug = sanitizeFilename(name.toLowerCase());
       const isChar = category === 'character';
+      const isIdea = category === 'idea';
 
       let dir = '';
       if (activeNovelId === 'default') {
-        dir = isChar ? 'bible/characters' : 'bible/world';
+        if (isIdea) {
+          dir = 'scratchpad';
+        } else {
+          dir = isChar ? 'bible/characters' : 'bible/world';
+        }
       } else {
-        dir = isChar ? `novels/${activeNovelId}/bible/characters` : `novels/${activeNovelId}/bible/world`;
+        if (isIdea) {
+          dir = `novels/${activeNovelId}/scratchpad`;
+        } else {
+          dir = isChar ? `novels/${activeNovelId}/bible/characters` : `novels/${activeNovelId}/bible/world`;
+        }
       }
 
       const filePath = `${dir}/${slug}.md`;
-      const titleLabel = isChar ? 'Character' : 'World';
-      const attrLabel = isChar ? 'Role' : 'Atmosphere';
+      let markdownContent = '';
 
-      const markdownContent = `# ${titleLabel}: ${name}\n\n- **${attrLabel}**: ${details.roleOrAtmosphere || ''}\n- **Summary**: ${details.summary || ''}\n`;
+      if (isIdea) {
+        const statusVal = details.roleOrAtmosphere || 'Rough Concept';
+        markdownContent = `# Idea: ${name}\n\n- **Status**: ${statusVal}\n- **Summary**: ${details.summary || ''}\n\nNotes & inspirations for this idea...\n`;
+      } else {
+        const titleLabel = isChar ? 'Character' : 'World';
+        const attrLabel = isChar ? 'Role' : 'Atmosphere';
+        markdownContent = `# ${titleLabel}: ${name}\n\n- **${attrLabel}**: ${details.roleOrAtmosphere || ''}\n- **Summary**: ${details.summary || ''}\n`;
+      }
 
       await fs.writeFile(filePath, markdownContent);
 
@@ -128,6 +153,7 @@ export function useLoreManager(activeNovelId: string = 'default', bibleFiles: Fi
     entries,
     characters,
     loreItems,
+    ideas,
     entriesMap,
     isLoading,
     createLoreEntry,

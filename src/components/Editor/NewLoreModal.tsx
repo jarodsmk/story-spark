@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { User, Compass, X, Sparkles, Plus } from 'lucide-react';
+import { User, Compass, X, Sparkles, Plus, Lightbulb } from 'lucide-react';
 
 interface NewLoreModalProps {
   isOpen: boolean;
-  initialCategory: 'character' | 'world';
+  initialCategory: 'character' | 'world' | 'idea';
   defaultName: string;
   onSubmit: (
     name: string,
-    category: 'character' | 'world',
+    category: 'character' | 'world' | 'idea',
     details: { roleOrAtmosphere: string; summary: string }
   ) => Promise<void>;
   onClose: () => void;
@@ -20,7 +20,7 @@ export const NewLoreModal: React.FC<NewLoreModalProps> = ({
   onSubmit,
   onClose,
 }) => {
-  const [category, setCategory] = useState<'character' | 'world'>(initialCategory);
+  const [category, setCategory] = useState<'character' | 'world' | 'idea'>(initialCategory);
   const [name, setName] = useState('');
   const [roleOrAtmosphere, setRoleOrAtmosphere] = useState('');
   const [summary, setSummary] = useState('');
@@ -50,7 +50,7 @@ export const NewLoreModal: React.FC<NewLoreModalProps> = ({
       });
       onClose();
     } catch (err) {
-      console.error('Failed to create bible entry', err);
+      console.error('Failed to create entry', err);
     } finally {
       setIsSubmitting(false);
     }
@@ -65,11 +65,25 @@ export const NewLoreModal: React.FC<NewLoreModalProps> = ({
         {/* Modal Header */}
         <div className="h-12 border-b border-stone-800 px-4 flex items-center justify-between bg-stone-950/50">
           <div className="flex items-center space-x-2">
-            <span className="p-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
-              <Sparkles className="w-4 h-4" />
+            <span
+              className={`p-1 rounded border ${
+                category === 'character'
+                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                  : category === 'world'
+                  ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
+                  : 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+              }`}
+            >
+              {category === 'character' ? (
+                <User className="w-4 h-4" />
+              ) : category === 'world' ? (
+                <Compass className="w-4 h-4" />
+              ) : (
+                <Lightbulb className="w-4 h-4" />
+              )}
             </span>
             <span className="font-semibold text-stone-100 text-sm">
-              Add Story Bible Entry
+              {category === 'idea' ? 'Jot Scratchpad Idea' : 'Add Story Bible Entry'}
             </span>
           </div>
           <button
@@ -85,11 +99,11 @@ export const NewLoreModal: React.FC<NewLoreModalProps> = ({
           {/* Category Switcher */}
           <div className="space-y-1.5">
             <label className="text-[11px] font-medium text-stone-400">Entry Type</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => setCategory('character')}
-                className={`py-2 px-3 rounded-lg border flex items-center justify-center gap-2 transition ${
+                className={`py-2 px-2 rounded-lg border flex items-center justify-center gap-1.5 transition text-center ${
                   category === 'character'
                     ? 'bg-amber-950/60 border-amber-600/80 text-amber-200 font-semibold shadow-sm'
                     : 'bg-stone-950 border-stone-800 text-stone-400 hover:text-stone-200 hover:border-stone-700'
@@ -102,14 +116,27 @@ export const NewLoreModal: React.FC<NewLoreModalProps> = ({
               <button
                 type="button"
                 onClick={() => setCategory('world')}
-                className={`py-2 px-3 rounded-lg border flex items-center justify-center gap-2 transition ${
+                className={`py-2 px-2 rounded-lg border flex items-center justify-center gap-1.5 transition text-center ${
                   category === 'world'
                     ? 'bg-cyan-950/60 border-cyan-600/80 text-cyan-200 font-semibold shadow-sm'
                     : 'bg-stone-950 border-stone-800 text-stone-400 hover:text-stone-200 hover:border-stone-700'
                 }`}
               >
                 <Compass className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Lore & World</span>
+                <span>Lore</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCategory('idea')}
+                className={`py-2 px-2 rounded-lg border flex items-center justify-center gap-1.5 transition text-center ${
+                  category === 'idea'
+                    ? 'bg-purple-950/60 border-purple-600/80 text-purple-200 font-semibold shadow-sm'
+                    : 'bg-stone-950 border-stone-800 text-stone-400 hover:text-stone-200 hover:border-stone-700'
+                }`}
+              >
+                <Lightbulb className="w-3.5 h-3.5 text-purple-400" />
+                <span>Scratchpad</span>
               </button>
             </div>
           </div>
@@ -117,23 +144,37 @@ export const NewLoreModal: React.FC<NewLoreModalProps> = ({
           {/* Name Field */}
           <div className="space-y-1.5">
             <label className="text-[11px] font-medium text-stone-400">
-              {category === 'character' ? 'Character Name' : 'Lore / World Title'}
+              {category === 'character'
+                ? 'Character Name'
+                : category === 'world'
+                ? 'Lore / World Title'
+                : 'Idea Title'}
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={category === 'character' ? 'e.g. Kaelen Vance' : 'e.g. The Port of Ash'}
+              placeholder={
+                category === 'character'
+                  ? 'e.g. Kaelen Vance'
+                  : category === 'world'
+                  ? 'e.g. The Port of Ash'
+                  : 'e.g. Ancient Belltower Secret Passage'
+              }
               required
               autoFocus
               className="w-full bg-stone-950 border border-stone-700/80 rounded-lg px-3 py-2 text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
             />
           </div>
 
-          {/* Role / Atmosphere Field */}
+          {/* Role / Atmosphere / Status Field */}
           <div className="space-y-1.5">
             <label className="text-[11px] font-medium text-stone-400">
-              {category === 'character' ? 'Role / Archetype' : 'Atmosphere / Category'}
+              {category === 'character'
+                ? 'Role / Archetype'
+                : category === 'world'
+                ? 'Atmosphere / Category'
+                : 'Tags / Focus Area'}
             </label>
             <input
               type="text"
@@ -142,7 +183,9 @@ export const NewLoreModal: React.FC<NewLoreModalProps> = ({
               placeholder={
                 category === 'character'
                   ? 'e.g. Reluctant Scout, Mentor, Inquisitor'
-                  : 'e.g. Coastal Harbor, Ancient Faction, Magitech Relic'
+                  : category === 'world'
+                  ? 'e.g. Coastal Harbor, Ancient Faction, Magitech Relic'
+                  : 'e.g. Subplot Hook, Foreshadowing, Clue'
               }
               className="w-full bg-stone-950 border border-stone-700/80 rounded-lg px-3 py-2 text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
             />
@@ -151,7 +194,7 @@ export const NewLoreModal: React.FC<NewLoreModalProps> = ({
           {/* Summary / Notes Field */}
           <div className="space-y-1.5">
             <label className="text-[11px] font-medium text-stone-400">
-              Quick Summary (Shown on Hover)
+              {category === 'idea' ? 'Idea Notes / Reference Outline' : 'Quick Summary (Shown on Hover)'}
             </label>
             <textarea
               value={summary}
@@ -160,7 +203,9 @@ export const NewLoreModal: React.FC<NewLoreModalProps> = ({
               placeholder={
                 category === 'character'
                   ? 'e.g. Tall, weathered hands. Deliver the encrypted atlas before the Grand Inquisitor seals the gates.'
-                  : 'e.g. Drenched in perpetual fog, smelling of salted timber and bitter sea spray.'
+                  : category === 'world'
+                  ? 'e.g. Drenched in perpetual fog, smelling of salted timber and bitter sea spray.'
+                  : 'e.g. If the protagonist pulls the lower lever, the resonance cancels out the sound barrier...'
               }
               className="w-full bg-stone-950 border border-stone-700/80 rounded-lg px-3 py-2 text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 resize-none font-sans"
             />
@@ -178,10 +223,20 @@ export const NewLoreModal: React.FC<NewLoreModalProps> = ({
             <button
               type="submit"
               disabled={!name.trim() || isSubmitting}
-              className="px-4 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-stone-950 font-semibold rounded-lg flex items-center gap-1.5 transition shadow-sm"
+              className={`px-4 py-1.5 text-stone-950 font-semibold rounded-lg flex items-center gap-1.5 transition shadow-sm disabled:opacity-40 ${
+                category === 'idea'
+                  ? 'bg-purple-500 hover:bg-purple-400'
+                  : 'bg-amber-600 hover:bg-amber-500'
+              }`}
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>{isSubmitting ? 'Creating...' : 'Create & Reference'}</span>
+              <span>
+                {isSubmitting
+                  ? 'Creating...'
+                  : category === 'idea'
+                  ? 'Save & Link Idea'
+                  : 'Create & Reference'}
+              </span>
             </button>
           </div>
         </form>

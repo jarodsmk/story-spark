@@ -40,7 +40,7 @@ export interface RecentDocument {
   id: string;
   path: string;
   title: string;
-  type: 'scene' | 'character' | 'bible';
+  type: 'scene' | 'character' | 'bible' | 'scratchpad';
   lastOpened: number;
 }
 
