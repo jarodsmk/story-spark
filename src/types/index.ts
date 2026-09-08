@@ -53,6 +53,35 @@ export interface BibleEntity {
   tags?: string[];
 }
 
+export interface CustomAttribute {
+  key: string;
+  value: string;
+}
+
+export interface CharacterMetadata {
+  id: string;
+  filePath: string;
+  filename: string;
+  name: string;
+  role: string;
+  archetype: string;
+  status: string;
+  age: string;
+  aliases: string;
+  appearance: string;
+  goal: string;
+  conflict: string;
+  stakes: string;
+  mannerisms: string;
+  affiliation: string;
+  relationships: string;
+  tags: string;
+  summary: string;
+  customAttributes: CustomAttribute[];
+  notes: string;
+  updatedAt?: number;
+}
+
 export interface SceneDocument {
   id: string;
   title: string;

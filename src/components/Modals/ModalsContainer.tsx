@@ -53,6 +53,8 @@ interface ModalsProps {
   bibleFiles?: FileItem[];
   activeFilePath?: string;
   currentEditorContent?: string;
+  isImporting?: boolean;
+  setIsImporting?: (v: boolean) => void;
 }
 
 export const ModalsContainer: React.FC<ModalsProps> = ({
@@ -89,14 +91,21 @@ export const ModalsContainer: React.FC<ModalsProps> = ({
   bibleFiles = [],
   activeFilePath,
   currentEditorContent,
+  isImporting = false,
+  setIsImporting,
 }) => {
   const handleNovelCrafterImport = async (
     parsed: NovelCrafterParseResult,
     options: NovelCrafterImportOptions
   ) => {
-    const res = await onImportNovelCrafter(parsed, options);
-    await refreshFileList(res.novel.id);
-    return res;
+    setIsImporting?.(true);
+    try {
+      const res = await onImportNovelCrafter(parsed, options);
+      await refreshFileList(res.novel.id);
+      return res;
+    } finally {
+      setIsImporting?.(false);
+    }
   };
 
   const handleOpenSceneAfterImport = async (scenePath: string) => {
@@ -110,12 +119,18 @@ export const ModalsContainer: React.FC<ModalsProps> = ({
         onClose={() => setIsImportOpen(false)}
         currentNovels={novels}
         activeNovel={activeNovel}
+        isImporting={isImporting}
         onExecuteImportNovelCrafter={handleNovelCrafterImport}
         onOpenScene={handleOpenSceneAfterImport}
         onImport={async (title: string, content: string, type: 'scene' | 'character' | 'world') => {
-          const path = type === 'scene' ? await createScene(title) : await createBibleEntry(title, type);
-          await fs.writeFile(path, `# ${title}\n\n${content}`);
-          await loadFile(path);
+          setIsImporting?.(true);
+          try {
+            const path = type === 'scene' ? await createScene(title) : await createBibleEntry(title, type);
+            await fs.writeFile(path, `# ${title}\n\n${content}`);
+            await loadFile(path);
+          } finally {
+            setIsImporting?.(false);
+          }
         }}
       />
 

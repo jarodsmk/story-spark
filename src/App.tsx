@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { fs } from './storage/fs.ts';
 import { Suggestion, Novel, CoverTheme } from './types/index.ts';
 import { runAllChecks } from './engine/checks/index.ts';
@@ -13,6 +13,7 @@ import { useLoreManager } from './hooks/useLoreManager.ts';
 import { useSceneSummaries } from './hooks/useSceneSummaries.ts';
 import { useCoverTheme } from './hooks/useCoverTheme.ts';
 import { getDocumentCategory, isCharacterOrWorldDocument } from './utils/documentType.ts';
+import { Loader2 } from 'lucide-react';
 
 import { Sidebar } from './components/Navigation/Sidebar.tsx';
 import { EditorContainer } from './components/Editor/EditorContainer.tsx';
@@ -25,7 +26,7 @@ export function App() {
   const files = useProjectFiles(novelsState.activeNovelId);
   const settings = useProjectSettings();
   const hist = useHistory<string>('');
-  const lore = useLoreManager(novelsState.activeNovelId, files.bibleFiles);
+  const lore = useLoreManager(novelsState.activeNovelId, files.bibleFiles, files.scratchpadFiles);
   const sceneSummaries = useSceneSummaries(
     novelsState.activeNovelId,
     files.sceneFiles,
@@ -33,11 +34,24 @@ export function App() {
     novelsState.activeNovel?.customPrompts?.summarization
   );
 
-  const { currentTheme, isThemeActive } = useCoverTheme(novelsState.activeNovel, {
-    onSaveTheme: async (novelId, theme) => {
+  const [isLoadingCurrentScene, setIsLoadingCurrentScene] = useState<boolean>(true);
+  const [isImporting, setIsImporting] = useState<boolean>(false);
+
+  const handleSaveTheme = useCallback(
+    async (novelId: string, theme: any) => {
       await novelsState.updateNovel(novelId, { coverTheme: theme });
     },
-  });
+    [novelsState.updateNovel]
+  );
+
+  const coverThemeOptions = useMemo(
+    () => ({
+      onSaveTheme: handleSaveTheme,
+    }),
+    [handleSaveTheme]
+  );
+
+  const { currentTheme, isThemeActive } = useCoverTheme(novelsState.activeNovel, coverThemeOptions);
 
   const [baseline, setBaseline] = useState('');
   const [saving, setSaving] = useState(false);
@@ -118,9 +132,12 @@ export function App() {
   const loadedPathRef = useRef<string>('');
 
   const loadFile = async (path: string) => {
+    setIsLoadingCurrentScene(true);
     try {
       loadedPathRef.current = path;
-      files.setActiveFilePath(path);
+      if (files.activeFilePath !== path) {
+        files.setActiveFilePath(path);
+      }
       files.setActiveFileName(path.split('/').pop() || path);
       let c: string;
       try {
@@ -139,6 +156,8 @@ export function App() {
       setAiSuggestions([]);
     } catch (e) {
       console.error('Failed to load file at', path, e);
+    } finally {
+      setIsLoadingCurrentScene(false);
     }
   };
 
@@ -173,11 +192,11 @@ export function App() {
 
   const priorSummaries = useMemo(() => {
     return sceneSummaries.getPriorSceneSummaries(files.activeFilePath);
-  }, [sceneSummaries, files.activeFilePath]);
+  }, [sceneSummaries.summaries, files.activeFilePath]);
 
   const allSummaries = useMemo(() => {
     return sceneSummaries.getAllSceneSummaries();
-  }, [sceneSummaries]);
+  }, [sceneSummaries.summaries]);
 
   const currentSummary = sceneSummaries.getSummary(files.activeFilePath);
 
@@ -319,10 +338,37 @@ export function App() {
         backgroundImage: isThemeActive && currentTheme ? 'var(--app-glow)' : undefined,
       }}
     >
+      {/* Top Page Loading Bar */}
+      {(files.isLoadingScenes || isLoadingCurrentScene || isImporting) && (
+        <div
+          id="global-page-loading-bar"
+          className="fixed top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-amber-500 via-amber-300 to-amber-500 z-50 animate-pulse shadow-[0_0_10px_rgba(245,158,11,0.8)]"
+        />
+      )}
+
+      {/* Floating Status Pill for Page Loading */}
+      {(files.isLoadingScenes || isLoadingCurrentScene || isImporting) && (
+        <div
+          id="global-page-loading-status"
+          className="fixed top-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-3 py-1.5 rounded-full bg-stone-900/95 border border-amber-500/40 text-amber-200 text-xs font-medium shadow-2xl backdrop-blur-md pointer-events-none"
+        >
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400 shrink-0" />
+          <span>
+            {isImporting
+              ? 'Importing manuscript and assets...'
+              : isLoadingCurrentScene
+              ? `Loading scene${files.activeFileName ? `: ${files.activeFileName.replace(/\.md$/, '').replace(/^\d+-/, '')}` : '...'}`
+              : 'Loading scenes...'}
+          </span>
+        </div>
+      )}
+
       <Sidebar
         sceneFiles={files.sceneFiles}
         bibleFiles={files.bibleFiles}
         activeFilePath={files.activeFilePath}
+        isLoadingScenes={files.isLoadingScenes}
+        isLoadingCurrentScene={isLoadingCurrentScene}
         onSelectFile={loadFile}
         onNewScene={async () => {
           const t = prompt('Scene title:');
@@ -419,6 +465,7 @@ export function App() {
         documentCategory={documentCategory}
         isSidebarCollapsed={isSidebarCollapsed}
         onToggleSidebarCollapse={handleToggleSidebarCollapse}
+        isLoadingCurrentScene={isLoadingCurrentScene}
       />
 
       <SettingsModal
@@ -469,6 +516,8 @@ export function App() {
         bibleFiles={files.bibleFiles}
         activeFilePath={files.activeFilePath}
         currentEditorContent={hist.state}
+        isImporting={isImporting}
+        setIsImporting={setIsImporting}
       />
 
       <SceneSummaryModal

@@ -218,8 +218,27 @@ export const NovelCrafterImportView: React.FC<NovelCrafterImportViewProps> = ({
         </div>
       )}
 
+      {/* Import In Progress Loader View */}
+      {isImporting && (
+        <div id="novelcrafter-import-processing-view" className="py-12 px-6 flex flex-col items-center justify-center text-center space-y-4 bg-stone-950/60 rounded-xl border border-stone-800">
+          <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-xl">
+            <Loader2 className="w-8 h-8 animate-spin" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-stone-100">Importing Novel to StorySpark...</h3>
+            <p className="text-xs text-stone-400 mt-1 max-w-sm mx-auto">
+              Extracting scenes, formatting markdown, creating character profiles, and building story bible entries.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-[11px] text-amber-400 font-mono bg-stone-900 px-3 py-1.5 rounded-full border border-stone-800 shadow-sm">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
+            <span>Writing files and compiling manuscript...</span>
+          </div>
+        </div>
+      )}
+
       {/* Parsed staging preview & options */}
-      {parsedData && !importSuccess && (
+      {parsedData && !importSuccess && !isImporting && (
         <form onSubmit={handleStartImport} className="space-y-4">
           {/* Header Card */}
           <div className="p-3.5 rounded-lg bg-stone-950 border border-stone-800 space-y-3">

@@ -3,9 +3,11 @@ import { fs, FileItem } from '../storage/fs.ts';
 import { SceneSummary, LLMSettings } from '../types/index.ts';
 import { summarizeSceneContent } from '../engine/ai/index.ts';
 
+const EMPTY_SCENE_FILES: FileItem[] = [];
+
 export function useSceneSummaries(
   activeNovelId: string = 'default',
-  sceneFiles: FileItem[] = [],
+  sceneFiles: FileItem[] = EMPTY_SCENE_FILES,
   llmSettings?: LLMSettings,
   customSystemPrompt?: string
 ) {

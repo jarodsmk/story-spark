@@ -12,6 +12,7 @@ import {
   User,
   Compass,
   Tag,
+  Loader2,
 } from 'lucide-react';
 import { Suggestion, LLMSettings, NovelCustomPrompts } from '../../types/index.ts';
 import {
@@ -66,6 +67,7 @@ interface SourcePaneProps {
   onOpenSceneSummary?: () => void;
   isCharacterOrWorld?: boolean;
   documentCategory?: DocumentCategory;
+  isLoadingCurrentScene?: boolean;
 }
 
 export const SourcePane: React.FC<SourcePaneProps> = ({
@@ -102,6 +104,7 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
   onOpenSceneSummary,
   isCharacterOrWorld = false,
   documentCategory = 'scene',
+  isLoadingCurrentScene = false,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -492,6 +495,16 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
           <FileText className="w-4 h-4 text-amber-500 flex-shrink-0" />
           <span className="font-medium text-sm text-stone-200 truncate">{title}</span>
 
+          {isLoadingCurrentScene && (
+            <span
+              id="source-pane-loading-indicator"
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-medium ml-1 animate-pulse flex-shrink-0"
+            >
+              <Loader2 className="w-3 h-3 animate-spin text-amber-400" />
+              <span>Loading scene...</span>
+            </span>
+          )}
+
           {documentCategory === 'character' && (
             <span className="text-[10px] bg-blue-950/70 text-blue-300 border border-blue-800/50 px-1.5 py-0.5 rounded font-mono flex items-center gap-1 flex-shrink-0">
               <User className="w-2.5 h-2.5" /> Character
@@ -687,6 +700,21 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
 
       {/* Editor Body */}
       <div className="flex-1 relative flex flex-col p-4 overflow-hidden">
+        {isLoadingCurrentScene && (
+          <div
+            id="current-scene-loading-overlay"
+            className="absolute inset-0 z-30 bg-stone-900/80 backdrop-blur-[2px] flex flex-col items-center justify-center p-6 text-center select-none"
+          >
+            <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-3 shadow-lg">
+              <Loader2 className="w-6 h-6 animate-spin text-amber-400" />
+            </div>
+            <p className="text-sm font-semibold text-stone-200">Loading Scene Content</p>
+            <p className="text-xs text-stone-400 mt-1 max-w-xs truncate font-mono">
+              {title ? title.replace(/\.md$/, '').replace(/^\d+-/, '') : 'Opening scene...'}
+            </p>
+          </div>
+        )}
+
         {viewMode === 'edit' ? (
           <div className="relative w-full h-full">
             {/* Synchronized highlight backdrop */}

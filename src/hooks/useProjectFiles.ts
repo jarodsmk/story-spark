@@ -8,6 +8,7 @@ export function useProjectFiles(activeNovelId: string = 'default') {
   const [scratchpadFiles, setScratchpadFiles] = useState<FileItem[]>([]);
   const [activeFilePath, setActiveFilePath] = useState<string>('scenes/01-prologue.md');
   const [activeFileName, setActiveFileName] = useState<string>('01-prologue.md');
+  const [isLoadingScenes, setIsLoadingScenes] = useState<boolean>(true);
 
   const getPaths = (novelId: string) => {
     if (novelId === 'default') {
@@ -41,29 +42,36 @@ export function useProjectFiles(activeNovelId: string = 'default') {
   useEffect(() => {
     let isMounted = true;
     async function loadNovelFiles() {
-      const { scenes } = await refreshFileList(activeNovelId);
-      if (!isMounted) return;
-      if (scenes.length > 0) {
-        setActiveFilePath(scenes[0].path);
-        setActiveFileName(scenes[0].name);
-      } else {
-        const defaultPath = activeNovelId === 'default'
-          ? 'scenes/01-prologue.md'
-          : `novels/${activeNovelId}/scenes/01-chapter-1.md`;
-        const defaultTitle = activeNovelId === 'default' ? 'Prologue' : 'Chapter 1';
-        try {
-          await fs.readFile(defaultPath);
-        } catch {
-          await fs.writeFile(defaultPath, `# ${defaultTitle}\n\nBegin your novel here...`);
-        }
-        const refreshed = await refreshFileList(activeNovelId);
+      setIsLoadingScenes(true);
+      try {
+        const { scenes } = await refreshFileList(activeNovelId);
         if (!isMounted) return;
-        if (refreshed.scenes.length > 0) {
-          setActiveFilePath(refreshed.scenes[0].path);
-          setActiveFileName(refreshed.scenes[0].name);
+        if (scenes.length > 0) {
+          setActiveFilePath(scenes[0].path);
+          setActiveFileName(scenes[0].name);
         } else {
-          setActiveFilePath(defaultPath);
-          setActiveFileName(defaultPath.split('/').pop() || '');
+          const defaultPath = activeNovelId === 'default'
+            ? 'scenes/01-prologue.md'
+            : `novels/${activeNovelId}/scenes/01-chapter-1.md`;
+          const defaultTitle = activeNovelId === 'default' ? 'Prologue' : 'Chapter 1';
+          try {
+            await fs.readFile(defaultPath);
+          } catch {
+            await fs.writeFile(defaultPath, `# ${defaultTitle}\n\nBegin your novel here...`);
+          }
+          const refreshed = await refreshFileList(activeNovelId);
+          if (!isMounted) return;
+          if (refreshed.scenes.length > 0) {
+            setActiveFilePath(refreshed.scenes[0].path);
+            setActiveFileName(refreshed.scenes[0].name);
+          } else {
+            setActiveFilePath(defaultPath);
+            setActiveFileName(defaultPath.split('/').pop() || '');
+          }
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingScenes(false);
         }
       }
     }
@@ -130,6 +138,7 @@ export function useProjectFiles(activeNovelId: string = 'default') {
     setActiveFilePath,
     activeFileName,
     setActiveFileName,
+    isLoadingScenes,
     refreshFileList,
     createScene,
     createBibleEntry,

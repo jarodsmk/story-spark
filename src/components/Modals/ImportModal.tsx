@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, FileUp, FileArchive, FileText } from 'lucide-react';
+import { X, FileUp, FileArchive, FileText, Loader2 } from 'lucide-react';
 import { parseImportedDocument } from '../../engine/markdown/index.ts';
 import { Novel } from '../../types/index.ts';
 import { NovelCrafterParseResult } from '../../engine/novelcrafter/index.ts';
@@ -9,7 +9,7 @@ import { NovelCrafterImportView } from './NovelCrafterImportView.tsx';
 interface ImportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onImport: (title: string, content: string, type: 'scene' | 'character' | 'world') => void;
+  onImport: (title: string, content: string, type: 'scene' | 'character' | 'world') => void | Promise<void>;
   currentNovels: Novel[];
   activeNovel: Novel;
   onExecuteImportNovelCrafter: (
@@ -18,6 +18,7 @@ interface ImportModalProps {
   ) => Promise<{ novel: Novel; firstScenePath: string; summary: NovelCrafterImportSummary }>;
   onOpenScene: (scenePath: string) => Promise<void>;
   initialTab?: 'novelcrafter' | 'single';
+  isImporting?: boolean;
 }
 
 export const ImportModal: React.FC<ImportModalProps> = ({
@@ -29,11 +30,13 @@ export const ImportModal: React.FC<ImportModalProps> = ({
   onExecuteImportNovelCrafter,
   onOpenScene,
   initialTab = 'novelcrafter',
+  isImporting = false,
 }) => {
   const [activeTab, setActiveTab] = useState<'novelcrafter' | 'single'>(initialTab);
   const [docType, setDocType] = useState<'scene' | 'character' | 'world'>('scene');
   const [filename, setFilename] = useState('');
   const [rawText, setRawText] = useState('');
+  const [isSubmittingSingle, setIsSubmittingSingle] = useState(false);
 
   if (!isOpen) return null;
 
@@ -55,15 +58,20 @@ export const ImportModal: React.FC<ImportModalProps> = ({
     reader.readAsText(file);
   };
 
-  const handleSubmitSingle = (e: React.FormEvent) => {
+  const handleSubmitSingle = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!rawText.trim()) return;
+    if (!rawText.trim() || isSubmittingSingle || isImporting) return;
 
-    const parsed = parseImportedDocument(rawText, filename || 'Imported Document');
-    onImport(parsed.title, parsed.body, docType);
-    setRawText('');
-    setFilename('');
-    onClose();
+    setIsSubmittingSingle(true);
+    try {
+      const parsed = parseImportedDocument(rawText, filename || 'Imported Document');
+      await onImport(parsed.title, parsed.body, docType);
+      setRawText('');
+      setFilename('');
+      onClose();
+    } finally {
+      setIsSubmittingSingle(false);
+    }
   };
 
   return (
@@ -165,17 +173,28 @@ export const ImportModal: React.FC<ImportModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-3 py-1.5 rounded text-xs text-stone-400 hover:text-stone-200 transition"
+                disabled={isSubmittingSingle || isImporting}
+                className="px-3 py-1.5 rounded text-xs text-stone-400 hover:text-stone-200 transition disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={!rawText.trim()}
+                id="import-single-submit-btn"
+                disabled={!rawText.trim() || isSubmittingSingle || isImporting}
                 className="px-4 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:bg-stone-800 disabled:text-stone-600 text-white font-medium rounded transition flex items-center gap-1.5"
               >
-                <FileUp className="w-3.5 h-3.5" />
-                Import Document
+                {isSubmittingSingle || isImporting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Importing...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileUp className="w-3.5 h-3.5" />
+                    <span>Import Document</span>
+                  </>
+                )}
               </button>
             </div>
           </form>

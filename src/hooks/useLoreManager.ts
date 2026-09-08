@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { fs, FileItem } from '../storage/fs.ts';
 import { sanitizeFilename } from '../engine/markdown/index.ts';
 import {
@@ -10,20 +10,30 @@ import {
   unlinkLoreReference,
 } from '../engine/lore/loreReference.ts';
 
+const EMPTY_FILES: FileItem[] = [];
+
 export function useLoreManager(
   activeNovelId: string = 'default',
-  bibleFiles: FileItem[] = [],
-  scratchpadFiles: FileItem[] = []
+  bibleFiles: FileItem[] = EMPTY_FILES,
+  scratchpadFiles: FileItem[] = EMPTY_FILES
 ) {
   const [entries, setEntries] = useState<LoreEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  const filesRef = useRef({ bibleFiles, scratchpadFiles });
+  filesRef.current = { bibleFiles, scratchpadFiles };
+
+  const filesSignature = useMemo(
+    () => [...bibleFiles, ...scratchpadFiles].map((f) => f.path).sort().join(';'),
+    [bibleFiles, scratchpadFiles]
+  );
 
   // Load and parse all bible and scratchpad files into LoreEntry objects
   const loadLoreEntries = useCallback(async () => {
     setIsLoading(true);
     try {
       const loaded: LoreEntry[] = [];
-      const allFiles = [...bibleFiles, ...scratchpadFiles];
+      const allFiles = [...filesRef.current.bibleFiles, ...filesRef.current.scratchpadFiles];
       for (const file of allFiles) {
         try {
           const content = await fs.readFile(file.path);
@@ -39,11 +49,11 @@ export function useLoreManager(
     } finally {
       setIsLoading(false);
     }
-  }, [bibleFiles, scratchpadFiles]);
+  }, []);
 
   useEffect(() => {
     loadLoreEntries();
-  }, [loadLoreEntries]);
+  }, [activeNovelId, filesSignature, loadLoreEntries]);
 
   const characters = useMemo(
     () => entries.filter((e) => e.category === 'character'),

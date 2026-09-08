@@ -53,6 +53,7 @@ interface EditorContainerProps {
   onToggleSidebarCollapse?: () => void;
   isCharacterOrWorld?: boolean;
   documentCategory?: DocumentCategory;
+  isLoadingCurrentScene?: boolean;
 }
 
 export const EditorContainer: React.FC<EditorContainerProps> = ({
@@ -98,6 +99,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
   onToggleSidebarCollapse,
   isCharacterOrWorld = false,
   documentCategory = 'scene',
+  isLoadingCurrentScene = false,
 }) => {
   const [selectedSuggestionId, setSelectedSuggestionId] = useState<string | null>(null);
   const [isDiffCollapsed, setIsDiffCollapsed] = useState<boolean>(() => {
@@ -246,6 +248,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
           onOpenSceneSummary={onOpenSceneSummary}
           isCharacterOrWorld={isCharacterOrWorld}
           documentCategory={documentCategory}
+          isLoadingCurrentScene={isLoadingCurrentScene}
         />
       </div>
 

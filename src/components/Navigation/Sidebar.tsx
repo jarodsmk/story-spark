@@ -17,6 +17,7 @@ import {
   Camera,
   PanelLeftClose,
   Lightbulb,
+  Loader2,
 } from 'lucide-react';
 import { FileItem } from '../../storage/fs.ts';
 import { Novel, SceneSummary, CoverTheme } from '../../types/index.ts';
@@ -43,10 +44,13 @@ interface SidebarProps {
   onOpenNovelPrompts?: (novel: Novel) => void;
   summaries?: Record<string, SceneSummary>;
   onOpenSceneSummaries?: (scenePath?: string) => void;
+  onOpenCharactersModal?: (characterPath?: string) => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
   currentTheme?: CoverTheme | null;
   isThemeActive?: boolean;
+  isLoadingScenes?: boolean;
+  isLoadingCurrentScene?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -74,6 +78,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   currentTheme,
   isThemeActive = false,
+  isLoadingScenes = false,
+  isLoadingCurrentScene = false,
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -137,6 +143,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
               )}
             </button>
+          )}
+
+          {/* Collapsed Scene Loader */}
+          {(isLoadingScenes || isLoadingCurrentScene) && (
+            <div
+              id="sidebar-collapsed-loader"
+              title={isLoadingScenes ? 'Loading scenes...' : 'Loading scene...'}
+              className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 my-1 animate-pulse"
+            >
+              <Loader2 className="w-4 h-4 animate-spin" />
+            </div>
           )}
 
           {/* Quick Scene Action: New Scene */}
@@ -475,8 +492,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Scenes */}
         <div>
           <div className="flex items-center justify-between px-1 mb-1 text-stone-400">
-            <span className="flex items-center gap-1 font-medium text-[10px] uppercase">
-              <BookText className="w-3 h-3 text-amber-500" /> Scenes ({sceneFiles.length})
+            <span className="flex items-center gap-1.5 font-medium text-[10px] uppercase">
+              <BookText className="w-3 h-3 text-amber-500" />
+              <span>Scenes</span>
+              {isLoadingScenes ? (
+                <span className="inline-flex items-center gap-1 text-amber-400 font-mono text-[9px] lowercase">
+                  <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                  loading...
+                </span>
+              ) : (
+                <span>({sceneFiles.length})</span>
+              )}
             </span>
             <div className="flex items-center gap-1">
               <button
@@ -492,58 +518,79 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             </div>
           </div>
-          {sceneFiles.map(f => {
-            const sumObj = summaries[f.path];
-            const hasSummary = Boolean(sumObj?.summary?.trim());
-            return (
-              <div
-                key={f.path}
-                onClick={() => onSelectFile(f.path)}
-                className={`group flex items-center justify-between px-2 py-1 rounded cursor-pointer ${
-                  activeFilePath === f.path ? 'bg-amber-950/60 text-amber-200 border border-amber-800/50' : 'text-stone-400 hover:bg-stone-900'
-                }`}
-              >
-                <div className="flex items-center gap-1.5 truncate flex-1 min-w-0 mr-1">
-                  <span className="truncate">{f.name.replace(/\.md$/, '').replace(/^\d+-/, '')}</span>
-                </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  {hasSummary ? (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenSceneSummaries?.(f.path);
-                      }}
-                      title={`Scene Summary (${sumObj.wordCount || 'active'} words) - Click to view`}
-                      className="text-amber-400/80 hover:text-amber-300 p-0.5 transition-colors"
-                    >
-                      <Sparkles className="w-3 h-3" />
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenSceneSummaries?.(f.path);
-                      }}
-                      title="Generate Scene Summary"
-                      className="opacity-0 group-hover:opacity-100 text-stone-600 hover:text-amber-400 p-0.5 transition-colors"
-                    >
-                      <Sparkles className="w-3 h-3" />
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); onDeleteFile(f.path); }}
-                    title="Delete Scene"
-                    className="opacity-0 group-hover:opacity-100 text-stone-500 hover:text-rose-400 p-0.5 transition-colors"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                </div>
+
+          {isLoadingScenes ? (
+            <div id="sidebar-scenes-loader" className="py-4 px-2.5 flex flex-col items-center justify-center gap-2 bg-stone-900/40 rounded-lg border border-stone-800/60 my-1">
+              <div className="flex items-center gap-2 text-amber-400 font-medium text-xs">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                <span>Loading scenes...</span>
               </div>
-            );
-          })}
+              <div className="w-full space-y-1.5 mt-1 px-1 opacity-40">
+                <div className="h-2.5 bg-stone-800 rounded animate-pulse w-3/4" />
+                <div className="h-2.5 bg-stone-800 rounded animate-pulse w-5/6" />
+                <div className="h-2.5 bg-stone-800 rounded animate-pulse w-2/3" />
+              </div>
+            </div>
+          ) : sceneFiles.length === 0 ? (
+            <div className="text-[11px] text-stone-500 italic px-2 py-1">No scenes yet.</div>
+          ) : (
+            sceneFiles.map(f => {
+              const sumObj = summaries[f.path];
+              const hasSummary = Boolean(sumObj?.summary?.trim());
+              const isThisSceneLoading = activeFilePath === f.path && isLoadingCurrentScene;
+              return (
+                <div
+                  key={f.path}
+                  onClick={() => onSelectFile(f.path)}
+                  className={`group flex items-center justify-between px-2 py-1 rounded cursor-pointer ${
+                    activeFilePath === f.path ? 'bg-amber-950/60 text-amber-200 border border-amber-800/50' : 'text-stone-400 hover:bg-stone-900'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 truncate flex-1 min-w-0 mr-1">
+                    {isThisSceneLoading && (
+                      <Loader2 className="w-3 h-3 animate-spin text-amber-400 shrink-0" />
+                    )}
+                    <span className="truncate">{f.name.replace(/\.md$/, '').replace(/^\d+-/, '')}</span>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {hasSummary ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenSceneSummaries?.(f.path);
+                        }}
+                        title={`Scene Summary (${sumObj.wordCount || 'active'} words) - Click to view`}
+                        className="text-amber-400/80 hover:text-amber-300 p-0.5 transition-colors"
+                      >
+                        <Sparkles className="w-3 h-3" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenSceneSummaries?.(f.path);
+                        }}
+                        title="Generate Scene Summary"
+                        className="opacity-0 group-hover:opacity-100 text-stone-600 hover:text-amber-400 p-0.5 transition-colors"
+                      >
+                        <Sparkles className="w-3 h-3" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onDeleteFile(f.path); }}
+                      title="Delete Scene"
+                      className="opacity-0 group-hover:opacity-100 text-stone-500 hover:text-rose-400 p-0.5 transition-colors"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
 
         {/* Characters */}
