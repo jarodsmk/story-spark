@@ -20,6 +20,7 @@ import {
 import { FileItem } from '../../storage/fs.ts';
 import { Novel, SceneSummary, CoverTheme, AuthorProfile } from '../../types/index.ts';
 import { PWAInstallButton } from '../Common/PWAInstallButton.tsx';
+import { MongoDbStatusIndicator } from '../Common/MongoDbStatusIndicator.tsx';
 
 export interface SidebarNavContentProps {
   isMobile?: boolean;
@@ -656,6 +657,11 @@ export const SidebarNavContent: React.FC<SidebarNavContentProps> = ({
         >
           <Settings className="w-4 h-4" /> Settings & Rules
         </button>
+        <MongoDbStatusIndicator
+          variant="sidebar"
+          onOpenSettings={() => handleAction(onOpenSettings)}
+          className="mt-1.5"
+        />
       </div>
     </div>
   );

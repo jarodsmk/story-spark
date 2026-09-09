@@ -346,6 +346,85 @@ export class LocalDatabase {
     }
     await this.saveSetting(AUTHOR_PROFILE_KEY, updated);
   }
+
+  async checkDbStatus(): Promise<MongoDbStatus> {
+    try {
+      const resp = await fetch(`${this.apiBaseUrl}/api/db/status`);
+      if (resp.ok) {
+        return await resp.json();
+      }
+    } catch {
+      // Offline fallback
+    }
+    return {
+      connected: false,
+      usingFallback: true,
+      databaseName: 'storyspark',
+      hasMongoUri: false,
+      maskedUri: null,
+      lastConnectedAt: null,
+      lastError: 'Network or backend unreachable',
+      pingTimeMs: null,
+    };
+  }
+
+  async reconnectDb(mongoUri?: string, dbName?: string): Promise<{ success: boolean; connected: boolean; databaseName?: string; error?: string | null }> {
+    try {
+      const resp = await fetch(`${this.apiBaseUrl}/api/db/reconnect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mongoUri, dbName }),
+      });
+      if (resp.ok) {
+        return await resp.json();
+      }
+    } catch (err: any) {
+      return { success: false, connected: false, error: err.message };
+    }
+    return { success: false, connected: false, error: 'Reconnection request failed' };
+  }
+
+  async syncToRemote(files: Array<{ path: string; content: string }>): Promise<{ success: boolean; syncedFilesCount: number; syncedSettingsCount: number }> {
+    try {
+      const settingsObj: Record<string, any> = {};
+      const keys = [RULES_KEY, IGNORED_KEY, RECENTS_KEY, LLM_SETTINGS_KEY, NOVELS_KEY, ACTIVE_NOVEL_KEY, DIFF_PANE_ENABLED_KEY, AUTHOR_PROFILE_KEY];
+      for (const k of keys) {
+        if (typeof localStorage !== 'undefined') {
+          const val = localStorage.getItem(k);
+          if (val !== null) {
+            try {
+              settingsObj[k] = JSON.parse(val);
+            } catch {
+              settingsObj[k] = val;
+            }
+          }
+        }
+      }
+
+      const resp = await fetch(`${this.apiBaseUrl}/api/db/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ files, settings: settingsObj }),
+      });
+      if (resp.ok) {
+        return await resp.json();
+      }
+    } catch {
+      // Offline fallback
+    }
+    return { success: false, syncedFilesCount: 0, syncedSettingsCount: 0 };
+  }
+}
+
+export interface MongoDbStatus {
+  connected: boolean;
+  usingFallback: boolean;
+  databaseName: string;
+  hasMongoUri: boolean;
+  maskedUri: string | null;
+  lastConnectedAt: string | null;
+  lastError: string | null;
+  pingTimeMs: number | null;
 }
 
 export const db = new LocalDatabase();

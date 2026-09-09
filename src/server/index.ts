@@ -5,8 +5,14 @@ import { geminiRouter } from './gemini.ts';
 
 const app = express();
 const port = process.env.PORT || 3001;
-const mongoUri = process.env.MONGODB_URI || '';
-const dbName = process.env.MONGODB_DB_NAME || 'storyspark';
+
+function getMongoUri(): string {
+  return process.env.MONGODB_URI || '';
+}
+
+function getDbName(): string {
+  return process.env.MONGODB_DB_NAME || 'storyspark';
+}
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -93,30 +99,76 @@ const inMemoryFallbackDb = new InMemoryDb();
 let isUsingInMemory = false;
 let client: MongoClient | null = null;
 let db: any = null;
+let currentClientUri = '';
+let lastConnectAttempt = 0;
+const RETRY_COOLDOWN_MS = 5000;
+let lastConnectError: string | null = null;
+let lastConnectedAt: string | null = null;
 
-async function getDb() {
-  if (isUsingInMemory) {
+async function connectToMongo(forceRetry = false): Promise<any> {
+  const uri = getMongoUri();
+  const name = getDbName();
+
+  if (!uri) {
+    isUsingInMemory = true;
+    lastConnectError = 'No MONGODB_URI configured';
     return inMemoryFallbackDb;
   }
-  if (!db) {
-    if (!mongoUri) {
-      console.warn('[AI Studio] No MONGODB_URI configured — using in-memory database fallback');
-      isUsingInMemory = true;
-      return inMemoryFallbackDb;
-    }
+
+  const now = Date.now();
+  if (!forceRetry && isUsingInMemory && (now - lastConnectAttempt) < RETRY_COOLDOWN_MS) {
+    return inMemoryFallbackDb;
+  }
+
+  // If already connected with same URI, verify connection ping
+  if (client && db && uri === currentClientUri) {
     try {
-      client = new MongoClient(mongoUri, {
-        serverSelectionTimeoutMS: 2000,
-      });
-      await client.connect();
-      db = client.db(dbName);
+      await db.command({ ping: 1 });
+      isUsingInMemory = false;
+      return db;
     } catch (err: any) {
-      console.warn('[AI Studio] MongoDB connection failed, falling back to in-memory store:', err.message);
-      isUsingInMemory = true;
-      return inMemoryFallbackDb;
+      console.warn('[MongoDB] Existing connection ping failed, attempting reconnect:', err.message);
+      try {
+        await client.close();
+      } catch {
+        // ignore close error
+      }
+      client = null;
+      db = null;
     }
   }
-  return db;
+
+  lastConnectAttempt = now;
+  try {
+    const newClient = new MongoClient(uri, {
+      serverSelectionTimeoutMS: 3000,
+      connectTimeoutMS: 5000,
+    });
+    await newClient.connect();
+    const newDb = newClient.db(name);
+    await newDb.command({ ping: 1 });
+
+    client = newClient;
+    db = newDb;
+    currentClientUri = uri;
+    isUsingInMemory = false;
+    lastConnectError = null;
+    lastConnectedAt = new Date().toISOString();
+    console.log(`[MongoDB] Connected successfully to database "${name}"`);
+    return db;
+  } catch (err: any) {
+    console.warn('[MongoDB] Connection failed, using in-memory store:', err.message);
+    isUsingInMemory = true;
+    lastConnectError = err.message || String(err);
+    return inMemoryFallbackDb;
+  }
+}
+
+async function getDb(forceRetry = false) {
+  if (client && db && !forceRetry && !isUsingInMemory && currentClientUri === getMongoUri()) {
+    return db;
+  }
+  return await connectToMongo(forceRetry);
 }
 
 // Initial seed data if collection is missing default files
@@ -180,18 +232,146 @@ function getRelativePath(req: express.Request): string {
   return (req.params as any)[0] || '';
 }
 
-// Health check
+// Health & DB status endpoints
 app.get('/api/health', async (_req, res) => {
   try {
     const database = await getDb();
     await database.command({ ping: 1 });
+    const uri = getMongoUri();
     res.json({
       status: 'ok',
       database: isUsingInMemory ? 'in-memory-mock' : 'connected',
-      mongodb: isUsingInMemory ? 'mock' : mongoUri,
+      mongodb: isUsingInMemory ? 'mock' : uri,
     });
   } catch (err: any) {
     res.status(503).json({ status: 'error', database: 'disconnected', error: err.message });
+  }
+});
+
+app.get('/api/db/status', async (_req, res) => {
+  const uri = getMongoUri();
+  const hasUri = Boolean(uri);
+  let isConnected = false;
+  let pingTimeMs: number | null = null;
+
+  if (client && db && !isUsingInMemory) {
+    try {
+      const start = Date.now();
+      await db.command({ ping: 1 });
+      pingTimeMs = Date.now() - start;
+      isConnected = true;
+    } catch {
+      isConnected = false;
+    }
+  }
+
+  // Mask sensitive parts of URI
+  const maskedUri = uri ? uri.replace(/:\/\/[^@]*@/, '://***@') : null;
+
+  res.json({
+    connected: isConnected,
+    usingFallback: isUsingInMemory || !isConnected,
+    databaseName: getDbName(),
+    hasMongoUri: hasUri,
+    maskedUri,
+    lastConnectedAt,
+    lastError: lastConnectError,
+    pingTimeMs,
+  });
+});
+
+app.post('/api/db/reconnect', async (req, res) => {
+  try {
+    if (req.body?.mongoUri && typeof req.body.mongoUri === 'string') {
+      process.env.MONGODB_URI = req.body.mongoUri.trim();
+    }
+    if (req.body?.dbName && typeof req.body.dbName === 'string') {
+      process.env.MONGODB_DB_NAME = req.body.dbName.trim();
+    }
+
+    // Force disconnect old client if any
+    if (client) {
+      try {
+        await client.close();
+      } catch {
+        // ignore
+      }
+      client = null;
+      db = null;
+    }
+
+    const database = await getDb(true);
+    let isConnected = false;
+    let pingTimeMs: number | null = null;
+
+    try {
+      const start = Date.now();
+      await database.command({ ping: 1 });
+      pingTimeMs = Date.now() - start;
+      isConnected = !isUsingInMemory;
+    } catch {
+      isConnected = false;
+    }
+
+    const uri = getMongoUri();
+    const maskedUri = uri ? uri.replace(/:\/\/[^@]*@/, '://***@') : null;
+
+    res.json({
+      success: isConnected,
+      connected: isConnected,
+      usingFallback: isUsingInMemory,
+      databaseName: getDbName(),
+      maskedUri,
+      error: lastConnectError,
+      pingTimeMs,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/db/sync', async (req, res) => {
+  try {
+    const { files, settings } = req.body;
+    const database = await getDb();
+    let syncedFilesCount = 0;
+    let syncedSettingsCount = 0;
+
+    if (Array.isArray(files)) {
+      const filesCol = database.collection('files');
+      for (const item of files) {
+        if (item.path && typeof item.content === 'string') {
+          await filesCol.updateOne(
+            { path: item.path },
+            { $set: { path: item.path, content: item.content, updatedAt: new Date() } },
+            { upsert: true }
+          );
+          syncedFilesCount++;
+        }
+      }
+    }
+
+    if (settings && typeof settings === 'object') {
+      const settingsCol = database.collection('settings');
+      for (const [key, value] of Object.entries(settings)) {
+        await settingsCol.updateOne(
+          { key },
+          { $set: { key, value, updatedAt: new Date() } },
+          { upsert: true }
+        );
+        syncedSettingsCount++;
+      }
+    }
+
+    res.json({
+      success: true,
+      syncedFilesCount,
+      syncedSettingsCount,
+      usingFallback: isUsingInMemory,
+      databaseName: getDbName(),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 

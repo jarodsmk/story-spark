@@ -5,6 +5,7 @@ import { RulesTab } from './RulesTab.tsx';
 import { AITab } from './AITab.tsx';
 import { TermsTab } from './TermsTab.tsx';
 import { AuthorTab } from './AuthorTab.tsx';
+import { DatabaseTab } from './DatabaseTab.tsx';
 import { ThemeModeToggle } from '../Common/ThemeModeToggle.tsx';
 
 interface SettingsModalProps {
@@ -42,7 +43,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   diffPaneEnabled = true,
   onToggleDiffPane,
 }) => {
-  const [tab, setTab] = useState<'appearance' | 'author' | 'rules' | 'ai' | 'terms'>('appearance');
+  const [tab, setTab] = useState<'appearance' | 'author' | 'rules' | 'ai' | 'terms' | 'database'>('appearance');
 
   if (!isOpen) return null;
 
@@ -65,13 +66,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         <div className="flex border-b border-stone-800 px-2 bg-stone-950/40 flex-shrink-0 overflow-x-auto">
-          {(['appearance', 'author', 'rules', 'ai', 'terms'] as const).map(t => (
+          {(['appearance', 'author', 'rules', 'ai', 'terms', 'database'] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={`py-1.5 px-3 border-b-2 font-medium capitalize cursor-pointer whitespace-nowrap ${tab === t ? 'border-amber-500 text-amber-400' : 'border-transparent text-stone-400 hover:text-stone-200'}`}
             >
-              {t === 'ai' ? 'BYOM' : t === 'appearance' ? 'Appearance & Layout' : t === 'author' ? 'Author Profile' : t}
+              {t === 'ai' ? 'BYOM' : t === 'appearance' ? 'Appearance & Layout' : t === 'author' ? 'Author Profile' : t === 'database' ? 'MongoDB & Sync' : t}
             </button>
           ))}
         </div>
@@ -195,6 +196,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {tab === 'rules' && <RulesTab rules={rules} onToggle={handleToggle} />}
           {tab === 'ai' && <AITab settings={llmSettings} onSave={onSaveLLMSettings} />}
           {tab === 'terms' && <TermsTab terms={ignoredTerms} onAdd={onAddIgnoredTerm} onRemove={onRemoveIgnoredTerm} />}
+          {tab === 'database' && <DatabaseTab />}
         </div>
       </div>
     </div>

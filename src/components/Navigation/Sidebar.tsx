@@ -19,6 +19,7 @@ import { Novel, SceneSummary, CoverTheme, AuthorProfile } from '../../types/inde
 import { AppLogo } from '../Common/AppLogo.tsx';
 import { SidebarNavContent } from './SidebarNavContent.tsx';
 import { PWAInstallButton } from '../Common/PWAInstallButton.tsx';
+import { MongoDbStatusIndicator } from '../Common/MongoDbStatusIndicator.tsx';
 
 interface SidebarProps {
   sceneFiles: FileItem[];
@@ -358,6 +359,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <Settings className="w-4 h-4" />
             </button>
+            <MongoDbStatusIndicator
+              variant="collapsed"
+              onOpenSettings={onOpenSettings}
+            />
           </div>
         </aside>
       </>

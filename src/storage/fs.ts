@@ -1,4 +1,5 @@
 import { sanitizeFilename } from '../engine/markdown/index.ts';
+import { db } from './db.ts';
 
 export interface FileItem {
   name: string;
@@ -265,6 +266,14 @@ class LocalFilesystem {
     this.memoryStore.clear();
     this.initDefaultProject();
     this.persistStore();
+  }
+
+  async syncAllToRemote(): Promise<{ success: boolean; syncedFilesCount: number; syncedSettingsCount: number }> {
+    const fileList: Array<{ path: string; content: string }> = [];
+    for (const [path, content] of this.memoryStore.entries()) {
+      fileList.push({ path, content });
+    }
+    return await db.syncToRemote(fileList);
   }
 }
 
