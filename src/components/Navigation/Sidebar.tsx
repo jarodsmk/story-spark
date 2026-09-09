@@ -11,6 +11,8 @@ import {
   Loader2,
   BookOpen,
   X,
+  Users,
+  Globe,
 } from 'lucide-react';
 import { FileItem } from '../../storage/fs.ts';
 import { Novel, SceneSummary, CoverTheme, AuthorProfile } from '../../types/index.ts';
@@ -23,6 +25,7 @@ interface SidebarProps {
   bibleFiles: FileItem[];
   scratchpadFiles?: FileItem[];
   activeFilePath: string;
+  totalWordCount?: number;
   summaries?: Record<string, SceneSummary>;
   isLoadingScenes?: boolean;
   isLoadingCurrentScene?: boolean;
@@ -56,6 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   bibleFiles,
   scratchpadFiles = [],
   activeFilePath,
+  totalWordCount,
   summaries = {},
   isLoadingScenes = false,
   isLoadingCurrentScene = false,
@@ -151,6 +155,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           bibleFiles={bibleFiles}
           scratchpadFiles={scratchpadFiles}
           activeFilePath={activeFilePath}
+          totalWordCount={totalWordCount}
           summaries={summaries}
           isLoadingScenes={isLoadingScenes}
           isLoadingCurrentScene={isLoadingCurrentScene}
@@ -236,9 +241,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
               id="sidebar-collapsed-new-scene-btn"
               onClick={onNewScene}
               title="New Scene"
-              className="p-2 text-stone-400 hover:text-white hover:bg-stone-900 rounded transition-colors"
+              className="p-2 text-stone-400 hover:text-white hover:bg-stone-900 rounded transition-colors cursor-pointer"
             >
               <FilePlus className="w-4 h-4" />
+            </button>
+
+            {/* Quick Character Action: New Character */}
+            <button
+              type="button"
+              id="sidebar-collapsed-new-character-btn"
+              onClick={() => onNewBibleEntry('character')}
+              title="New Character Profile"
+              className="p-2 text-stone-400 hover:text-blue-400 hover:bg-stone-900 rounded transition-colors cursor-pointer"
+            >
+              <Users className="w-4 h-4" />
+            </button>
+
+            {/* Quick World Action: New World */}
+            <button
+              type="button"
+              id="sidebar-collapsed-new-world-btn"
+              onClick={() => onNewBibleEntry('world')}
+              title="New World & Lore Entry"
+              className="p-2 text-stone-400 hover:text-emerald-400 hover:bg-stone-900 rounded transition-colors cursor-pointer"
+            >
+              <Globe className="w-4 h-4" />
             </button>
 
             {/* Quick Scratchpad Action */}
@@ -247,7 +274,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               id="sidebar-collapsed-scratchpad-btn"
               onClick={scratchpadFiles.length > 0 ? () => onSelectFile(scratchpadFiles[0].path) : onNewScratchpadIdea}
               title={`Scratchpad Ideas (${scratchpadFiles.length}) - Click to view or jot idea`}
-              className="p-2 text-purple-400 hover:text-purple-300 hover:bg-stone-900 rounded transition-colors relative"
+              className="p-2 text-purple-400 hover:text-purple-300 hover:bg-stone-900 rounded transition-colors relative cursor-pointer"
             >
               <Lightbulb className="w-4 h-4" />
               {scratchpadFiles.length > 0 && (
@@ -395,6 +422,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           bibleFiles={bibleFiles}
           scratchpadFiles={scratchpadFiles}
           activeFilePath={activeFilePath}
+          totalWordCount={totalWordCount}
           summaries={summaries}
           isLoadingScenes={isLoadingScenes}
           isLoadingCurrentScene={isLoadingCurrentScene}

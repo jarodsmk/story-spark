@@ -102,10 +102,22 @@ export function useProjectFiles(activeNovelId: string = 'default') {
   };
 
   const createScratchpadIdea = async (title: string, initialContent?: string): Promise<string> => {
-    const clean = sanitizeFilename(title.toLowerCase());
+    const safeTitle = title.trim() || `Idea ${scratchpadFiles.length + 1}`;
+    let clean = sanitizeFilename(safeTitle.toLowerCase());
+    if (!clean) {
+      clean = `idea-${Date.now()}`;
+    }
     const { scratchpadDir } = getPaths(activeNovelId);
-    const path = `${scratchpadDir}/${clean}.md`;
-    const content = initialContent ?? `# Idea: ${title}\n\n- **Status**: Rough Concept\n- **Summary**: Ad-hoc idea for reference and exploration.\n\nWrite down quick thoughts, plot hooks, research notes, or dialogue ideas...\n`;
+    let path = `${scratchpadDir}/${clean}.md`;
+    try {
+      const existing = await fs.readFile(path);
+      if (existing !== null && existing !== undefined) {
+        path = `${scratchpadDir}/${clean}-${Date.now().toString().slice(-4)}.md`;
+      }
+    } catch {
+      // File does not exist yet, good
+    }
+    const content = initialContent ?? `# Idea: ${safeTitle}\n\n- **Status**: Rough Concept\n- **Summary**: Ad-hoc idea for reference and exploration.\n\nWrite down quick thoughts, plot hooks, research notes, or dialogue ideas...\n`;
     await fs.writeFile(path, content);
     await refreshFileList();
     return path;
@@ -116,11 +128,16 @@ export function useProjectFiles(activeNovelId: string = 'default') {
     await refreshFileList();
   };
 
-  const getTotalWordCount = async (): Promise<number> => {
+  const getTotalWordCount = async (currentContent?: string, currentFilePath?: string): Promise<number> => {
     let total = 0;
     for (const f of sceneFiles) {
       try {
-        const text = await fs.readFile(f.path);
+        let text: string;
+        if (currentFilePath && f.path === currentFilePath && currentContent !== undefined) {
+          text = currentContent;
+        } else {
+          text = await fs.readFile(f.path);
+        }
         const words = text.trim().split(/\s+/).filter(Boolean).length;
         total += words;
       } catch {

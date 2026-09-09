@@ -35,6 +35,7 @@ export interface SidebarNavContentProps {
   bibleFiles: FileItem[];
   scratchpadFiles: FileItem[];
   activeFilePath: string;
+  totalWordCount?: number;
   summaries: Record<string, SceneSummary>;
   isLoadingScenes: boolean;
   isLoadingCurrentScene: boolean;
@@ -68,6 +69,7 @@ export const SidebarNavContent: React.FC<SidebarNavContentProps> = ({
   bibleFiles,
   scratchpadFiles = [],
   activeFilePath,
+  totalWordCount,
   summaries = {},
   isLoadingScenes = false,
   isLoadingCurrentScene = false,
@@ -91,10 +93,7 @@ export const SidebarNavContent: React.FC<SidebarNavContentProps> = ({
 
   const authorDisplayName = authorProfile?.penName || authorProfile?.name;
 
-  const currentTotalWords = Object.values(summaries).reduce(
-    (acc, s) => acc + (s.wordCount || 0),
-    0
-  );
+  const currentTotalWords = totalWordCount ?? 0;
 
   const handleAction = (cb?: () => void) => {
     cb?.();
@@ -332,9 +331,13 @@ export const SidebarNavContent: React.FC<SidebarNavContentProps> = ({
             <button
               type="button"
               id={isMobile ? 'mobile-sidebar-new-scene-btn' : 'sidebar-new-scene-btn'}
-              onClick={() => handleAction(onNewScene)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleAction(onNewScene);
+              }}
               title="Add New Scene"
-              className="p-1 hover:text-stone-200 text-stone-400 hover:bg-stone-900 rounded transition-colors"
+              className="p-1 hover:text-stone-200 text-stone-400 hover:bg-stone-900 rounded transition-colors cursor-pointer"
             >
               <FilePlus className="w-3.5 h-3.5" />
             </button>
@@ -419,41 +422,61 @@ export const SidebarNavContent: React.FC<SidebarNavContentProps> = ({
             <button
               type="button"
               id={isMobile ? 'mobile-sidebar-new-character-btn' : 'sidebar-new-character-btn'}
-              onClick={() => handleAction(() => onNewBibleEntry('character'))}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleAction(() => onNewBibleEntry('character'));
+              }}
               title="Add New Character"
-              className="p-1 hover:text-stone-200 text-stone-400 hover:bg-stone-900 rounded transition-colors"
+              className="p-1 hover:text-blue-300 text-stone-400 hover:bg-stone-900 rounded transition-colors cursor-pointer"
             >
               <FilePlus className="w-3.5 h-3.5" />
             </button>
           </div>
-          <div className="space-y-0.5">
-            {characters.map((f) => {
-              const isSelected = activeFilePath === f.path;
-              return (
-                <div
-                  key={f.path}
-                  onClick={() => handleAction(() => onSelectFile(f.path))}
-                  className={`group flex items-center justify-between px-2 py-1.5 rounded cursor-pointer transition-colors ${
-                    isSelected
-                      ? 'bg-blue-950/60 text-blue-200 border border-blue-800/60 shadow-xs'
-                      : 'text-stone-400 hover:bg-stone-900'
-                  }`}
-                >
-                  <span className="truncate">{f.name.replace(/\.md$/, '')}</span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteFile(f.path);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 text-stone-500 hover:text-rose-400 p-0.5 transition-colors"
+          {characters.length === 0 ? (
+            <button
+              type="button"
+              id={isMobile ? 'mobile-sidebar-empty-character-btn' : 'sidebar-empty-character-btn'}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleAction(() => onNewBibleEntry('character'));
+              }}
+              className="w-full text-left px-2 py-1.5 rounded border border-dashed border-stone-800 hover:border-blue-600/60 text-[11px] text-stone-500 hover:text-blue-300 hover:bg-blue-950/20 transition-all flex items-center gap-1.5 group cursor-pointer"
+            >
+              <Plus className="w-3 h-3 text-stone-600 group-hover:text-blue-400 flex-shrink-0" />
+              <span className="truncate">Add a character profile...</span>
+            </button>
+          ) : (
+            <div className="space-y-0.5">
+              {characters.map((f) => {
+                const isSelected = activeFilePath === f.path;
+                return (
+                  <div
+                    key={f.path}
+                    onClick={() => handleAction(() => onSelectFile(f.path))}
+                    className={`group flex items-center justify-between px-2 py-1.5 rounded cursor-pointer transition-colors ${
+                      isSelected
+                        ? 'bg-blue-950/60 text-blue-200 border border-blue-800/60 shadow-xs'
+                        : 'text-stone-400 hover:bg-stone-900'
+                    }`}
                   >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+                    <span className="truncate">{f.name.replace(/\.md$/, '')}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteFile(f.path);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 text-stone-500 hover:text-rose-400 p-0.5 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div>
@@ -465,41 +488,61 @@ export const SidebarNavContent: React.FC<SidebarNavContentProps> = ({
             <button
               type="button"
               id={isMobile ? 'mobile-sidebar-new-world-btn' : 'sidebar-new-world-btn'}
-              onClick={() => handleAction(() => onNewBibleEntry('world'))}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleAction(() => onNewBibleEntry('world'));
+              }}
               title="Add World / Setting Entry"
-              className="p-1 hover:text-stone-200 text-stone-400 hover:bg-stone-900 rounded transition-colors"
+              className="p-1 hover:text-emerald-300 text-stone-400 hover:bg-stone-900 rounded transition-colors cursor-pointer"
             >
               <FilePlus className="w-3.5 h-3.5" />
             </button>
           </div>
-          <div className="space-y-0.5">
-            {world.map((f) => {
-              const isSelected = activeFilePath === f.path;
-              return (
-                <div
-                  key={f.path}
-                  onClick={() => handleAction(() => onSelectFile(f.path))}
-                  className={`group flex items-center justify-between px-2 py-1.5 rounded cursor-pointer transition-colors ${
-                    isSelected
-                      ? 'bg-emerald-950/60 text-emerald-200 border border-emerald-800/60 shadow-xs'
-                      : 'text-stone-400 hover:bg-stone-900'
-                  }`}
-                >
-                  <span className="truncate">{f.name.replace(/\.md$/, '')}</span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteFile(f.path);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 text-stone-500 hover:text-rose-400 p-0.5 transition-colors"
+          {world.length === 0 ? (
+            <button
+              type="button"
+              id={isMobile ? 'mobile-sidebar-empty-world-btn' : 'sidebar-empty-world-btn'}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleAction(() => onNewBibleEntry('world'));
+              }}
+              className="w-full text-left px-2 py-1.5 rounded border border-dashed border-stone-800 hover:border-emerald-600/60 text-[11px] text-stone-500 hover:text-emerald-300 hover:bg-emerald-950/20 transition-all flex items-center gap-1.5 group cursor-pointer"
+            >
+              <Plus className="w-3 h-3 text-stone-600 group-hover:text-emerald-400 flex-shrink-0" />
+              <span className="truncate">Add world & lore entry...</span>
+            </button>
+          ) : (
+            <div className="space-y-0.5">
+              {world.map((f) => {
+                const isSelected = activeFilePath === f.path;
+                return (
+                  <div
+                    key={f.path}
+                    onClick={() => handleAction(() => onSelectFile(f.path))}
+                    className={`group flex items-center justify-between px-2 py-1.5 rounded cursor-pointer transition-colors ${
+                      isSelected
+                        ? 'bg-emerald-950/60 text-emerald-200 border border-emerald-800/60 shadow-xs'
+                        : 'text-stone-400 hover:bg-stone-900'
+                    }`}
                   >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+                    <span className="truncate">{f.name.replace(/\.md$/, '')}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteFile(f.path);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 text-stone-500 hover:text-rose-400 p-0.5 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Scratchpad Ideas */}
@@ -512,9 +555,13 @@ export const SidebarNavContent: React.FC<SidebarNavContentProps> = ({
             <button
               type="button"
               id={isMobile ? 'mobile-sidebar-new-scratchpad-idea-btn' : 'sidebar-new-scratchpad-idea-btn'}
-              onClick={() => handleAction(onNewScratchpadIdea)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleAction(onNewScratchpadIdea);
+              }}
               title="New Scratchpad Idea (Ad-hoc note)"
-              className="p-1 hover:text-purple-300 text-stone-400 hover:bg-stone-900 rounded transition-colors"
+              className="p-1 hover:text-purple-300 text-stone-400 hover:bg-stone-900 rounded transition-colors cursor-pointer"
             >
               <FilePlus className="w-3.5 h-3.5" />
             </button>
@@ -524,8 +571,12 @@ export const SidebarNavContent: React.FC<SidebarNavContentProps> = ({
             <button
               type="button"
               id={isMobile ? 'mobile-sidebar-empty-scratchpad-btn' : 'sidebar-empty-scratchpad-btn'}
-              onClick={() => handleAction(onNewScratchpadIdea)}
-              className="w-full text-left px-2 py-1.5 rounded border border-dashed border-stone-800 hover:border-purple-600/60 text-[11px] text-stone-500 hover:text-purple-300 hover:bg-purple-950/20 transition-all flex items-center gap-1.5 group"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleAction(onNewScratchpadIdea);
+              }}
+              className="w-full text-left px-2 py-1.5 rounded border border-dashed border-stone-800 hover:border-purple-600/60 text-[11px] text-stone-500 hover:text-purple-300 hover:bg-purple-950/20 transition-all flex items-center gap-1.5 group cursor-pointer"
             >
               <Plus className="w-3 h-3 text-stone-600 group-hover:text-purple-400 flex-shrink-0" />
               <span className="truncate">Jot down an ad-hoc idea...</span>

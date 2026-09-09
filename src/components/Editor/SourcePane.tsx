@@ -803,6 +803,11 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
               <Compass className="w-2.5 h-2.5" /> World
             </span>
           )}
+          {documentCategory === 'scratchpad' && (
+            <span className="text-[10px] bg-purple-950/70 text-purple-300 border border-purple-800/50 px-1.5 py-0.5 rounded font-mono flex items-center gap-1 flex-shrink-0">
+              <Lightbulb className="w-2.5 h-2.5" /> Scratchpad
+            </span>
+          )}
 
           {/* Highlight Visibility Toggle */}
           <button

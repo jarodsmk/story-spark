@@ -24,6 +24,7 @@ import { ModalsContainer } from './components/Modals/ModalsContainer.tsx';
 import { SceneSummaryModal } from './components/Modals/SceneSummaryModal.tsx';
 import { OfflineIndicator } from './components/Common/OfflineIndicator.tsx';
 import { FullScreenLoader } from './components/Common/FullScreenLoader.tsx';
+import { NewLoreModal, EntryCategory } from './components/Editor/NewLoreModal.tsx';
 
 export function App() {
   const themeModeState = useThemeMode();
@@ -84,6 +85,17 @@ export function App() {
   const [openCoverModal, setOpenCoverModal] = useState(false);
   const [coverTargetNovel, setCoverTargetNovel] = useState<Novel | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
+
+  // Global In-App Modal for creating Scenes, Characters, World entries, and Scratchpad Ideas
+  const [globalNewEntryModal, setGlobalNewEntryModal] = useState<{
+    isOpen: boolean;
+    category: EntryCategory;
+    defaultName: string;
+  }>({
+    isOpen: false,
+    category: 'character',
+    defaultName: '',
+  });
 
   // 2-second flash animation state for changed or added text via AI
   const [flashRange, setFlashRange] = useState<{ start: number; end: number; key: number } | null>(null);
@@ -245,6 +257,47 @@ export function App() {
     }
   };
 
+  const handleCreateNewEntry = useCallback(
+    async (
+      name: string,
+      category: EntryCategory,
+      details: { roleOrAtmosphere: string; summary: string }
+    ) => {
+      if (category === 'scene') {
+        const path = await files.createScene(name);
+        if (details.summary || details.roleOrAtmosphere) {
+          const metaHeader = [
+            `# ${name}`,
+            details.roleOrAtmosphere ? `**POV / Setting**: ${details.roleOrAtmosphere}` : '',
+            details.summary ? `> **Summary**: ${details.summary}` : '',
+            '',
+            'Write your scene here...',
+          ]
+            .filter((line) => line !== '')
+            .join('\n\n');
+          await fs.writeFile(path, metaHeader);
+        }
+        await files.refreshFileList();
+        await loadFile(path);
+      } else if (category === 'idea') {
+        const statusVal = details.roleOrAtmosphere || 'Rough Concept';
+        const content = `# Idea: ${name}\n\n- **Status**: ${statusVal}\n- **Summary**: ${
+          details.summary || 'Ad-hoc idea for reference and exploration.'
+        }\n\nWrite down quick thoughts, plot hooks, research notes, or dialogue ideas...\n`;
+        const path = await files.createScratchpadIdea(name, content);
+        await files.refreshFileList();
+        await loadFile(path);
+      } else {
+        const entry = await lore.createLoreEntry(name, category, details);
+        await files.refreshFileList();
+        if (entry?.path) {
+          await loadFile(entry.path);
+        }
+      }
+    },
+    [files, lore]
+  );
+
   // Sync loaded file with activeFilePath from useProjectFiles when it changes (e.g. novel switch)
   useEffect(() => {
     if (files.activeFilePath && files.activeFilePath !== loadedPathRef.current) {
@@ -285,13 +338,13 @@ export function App() {
   // Periodically refresh active novel word count
   useEffect(() => {
     let isMounted = true;
-    files.getTotalWordCount().then(w => {
+    files.getTotalWordCount(hist.state, files.activeFilePath).then(w => {
       if (isMounted) setActiveWordCount(w);
     });
     return () => {
       isMounted = false;
     };
-  }, [files.sceneFiles, hist.state]);
+  }, [files.sceneFiles, hist.state, files.activeFilePath]);
 
   const timer = useRef<any>(null);
   const handleChange = (c: string) => {
@@ -498,17 +551,32 @@ export function App() {
       <Sidebar
         sceneFiles={files.sceneFiles}
         bibleFiles={files.bibleFiles}
+        scratchpadFiles={files.scratchpadFiles}
+        totalWordCount={activeWordCount}
         activeFilePath={files.activeFilePath}
         isLoadingScenes={files.isLoadingScenes}
         isLoadingCurrentScene={isLoadingCurrentScene}
         onSelectFile={loadFile}
-        onNewScene={async () => {
-          const t = prompt('Scene title:');
-          if (t) loadFile(await files.createScene(t));
+        onNewScene={() => {
+          setGlobalNewEntryModal({
+            isOpen: true,
+            category: 'scene',
+            defaultName: '',
+          });
         }}
-        onNewBibleEntry={async (t) => {
-          const n = prompt(`${t} name:`);
-          if (n) loadFile(await files.createBibleEntry(n, t));
+        onNewBibleEntry={(type) => {
+          setGlobalNewEntryModal({
+            isOpen: true,
+            category: type === 'world' ? 'world' : 'character',
+            defaultName: '',
+          });
+        }}
+        onNewScratchpadIdea={() => {
+          setGlobalNewEntryModal({
+            isOpen: true,
+            category: 'idea',
+            defaultName: '',
+          });
         }}
         onDeleteFile={async (p) => {
           await files.deleteFile(p);
@@ -605,7 +673,7 @@ export function App() {
         priorSceneSummaries={priorSummaries}
         allSceneSummaries={allSummaries}
         onOpenSceneSummary={
-          isCharacterOrWorld
+          isCharacterOrWorld || documentCategory === 'scratchpad'
             ? undefined
             : () => {
                 setSummaryModalTargetFile(files.activeFilePath);
@@ -712,6 +780,15 @@ export function App() {
         onSelectScene={(p) => {
           loadFile(p);
         }}
+      />
+
+      <NewLoreModal
+        isOpen={globalNewEntryModal.isOpen}
+        initialCategory={globalNewEntryModal.category}
+        defaultName={globalNewEntryModal.defaultName}
+        allowScene={true}
+        onSubmit={handleCreateNewEntry}
+        onClose={() => setGlobalNewEntryModal((prev) => ({ ...prev, isOpen: false }))}
       />
 
       <OfflineIndicator />
