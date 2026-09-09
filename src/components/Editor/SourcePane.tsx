@@ -14,6 +14,12 @@ import {
   Tag,
   Loader2,
   Menu,
+  UserPlus,
+  Unlink,
+  ExternalLink,
+  Lightbulb,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { Suggestion, LLMSettings, NovelCustomPrompts } from '../../types/index.ts';
 import {
@@ -111,8 +117,21 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
+  const isHoveringTooltipRef = useRef<boolean>(false);
 
-  const [viewMode, setViewMode] = useState<'edit' | 'live'>('edit');
+  // Toggle highlight visibility (defaults to true)
+  const [showHighlights, setShowHighlights] = useState<boolean>(true);
+
+  // Active reference under cursor
+  const [activeCursorRef, setActiveCursorRef] = useState<LoreReferenceMatch | null>(null);
+
+  // Active selected text range
+  const [selectedRange, setSelectedRange] = useState<{
+    text: string;
+    start: number;
+    end: number;
+    existingRef?: LoreReferenceMatch | null;
+  } | null>(null);
 
   // Context Menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -138,6 +157,8 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
     entry?: LoreEntry | null;
     anchorText: string;
     targetPath: string;
+    startIndex?: number;
+    endIndex?: number;
     position: { x: number; y: number };
   } | null>(null);
 
@@ -212,7 +233,39 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
   const handleScroll = () => {
     if (textareaRef.current && backdropRef.current) {
       backdropRef.current.scrollTop = textareaRef.current.scrollTop;
+      backdropRef.current.scrollLeft = textareaRef.current.scrollLeft;
     }
+  };
+
+  // Direct unlink helper for quick actions
+  const handleUnlinkLoreDirect = (start?: number, end?: number) => {
+    if (onUnlinkLore && start !== undefined && end !== undefined) {
+      onUnlinkLore(start, end);
+      setActiveCursorRef(null);
+      setHoverTooltip(null);
+      setSelectedRange(null);
+    }
+  };
+
+  // Locate and scroll to reference in editor
+  const handleLocateReference = (ref: LoreReferenceMatch) => {
+    if (!textareaRef.current) return;
+    const textarea = textareaRef.current;
+    textarea.focus();
+    textarea.setSelectionRange(ref.startIndex, ref.endIndex);
+    onSelectionChange(ref.anchorText, ref.startIndex, ref.endIndex);
+    setActiveCursorRef(ref);
+
+    const textBefore = content.substring(0, ref.startIndex);
+    const lines = textBefore.split('\n').length;
+    const targetTop = lines * 26;
+    const containerHeight = textarea.clientHeight || 400;
+    const targetScrollTop = Math.max(0, targetTop - containerHeight / 2);
+
+    textarea.scrollTo({
+      top: targetScrollTop,
+      behavior: 'smooth',
+    });
   };
 
   const handleSelect = () => {
@@ -221,6 +274,80 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
     const end = textareaRef.current.selectionEnd;
     const selected = content.slice(start, end);
     onSelectionChange(selected, start, end);
+
+    // Detect if cursor is on or inside an existing reference
+    const existingRef = findReferenceAtCursor(content, start, loreEntries) ||
+                        (start !== end ? findReferenceAtCursor(content, end, loreEntries) : null);
+    setActiveCursorRef(existingRef);
+
+    if (start !== end && selected.trim()) {
+      setSelectedRange({ text: selected, start, end, existingRef });
+    } else {
+      setSelectedRange(null);
+    }
+  };
+
+  // Hover detection over highlighted spans in the editor
+  const handleTextareaMouseMove = (e: React.MouseEvent<HTMLTextAreaElement>) => {
+    if (!backdropRef.current || sceneReferences.length === 0 || !showHighlights) {
+      if (hoverTooltip && !isHoveringTooltipRef.current) setHoverTooltip(null);
+      return;
+    }
+
+    const clientX = e.clientX;
+    const clientY = e.clientY;
+
+    let foundRef: LoreReferenceMatch | null = null;
+    let foundRect: DOMRect | null = null;
+
+    for (let i = 0; i < sceneReferences.length; i++) {
+      const el = document.getElementById(`lore-highlight-${sceneReferences[i].startIndex}`);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        if (
+          clientX >= rect.left - 2 &&
+          clientX <= rect.right + 2 &&
+          clientY >= rect.top - 2 &&
+          clientY <= rect.bottom + 2
+        ) {
+          foundRef = sceneReferences[i];
+          foundRect = rect;
+          break;
+        }
+      }
+    }
+
+    if (foundRef && foundRect) {
+      setHoverTooltip({
+        entry: foundRef.entry || null,
+        anchorText: foundRef.anchorText,
+        targetPath: foundRef.targetPath,
+        startIndex: foundRef.startIndex,
+        endIndex: foundRef.endIndex,
+        position: { x: foundRect.left, y: foundRect.bottom },
+      });
+    } else if (!isHoveringTooltipRef.current) {
+      setHoverTooltip(null);
+    }
+  };
+
+  const handleTextareaMouseLeave = () => {
+    setTimeout(() => {
+      if (!isHoveringTooltipRef.current) {
+        setHoverTooltip(null);
+      }
+    }, 200);
+  };
+
+  const handleTextareaClick = (e: React.MouseEvent<HTMLTextAreaElement>) => {
+    if ((e.ctrlKey || e.metaKey) && hoverTooltip) {
+      if (onOpenFile) {
+        onOpenFile(hoverTooltip.entry?.path || hoverTooltip.targetPath);
+        setHoverTooltip(null);
+      }
+      return;
+    }
+    handleSelect();
   };
 
   // Right-click context menu handler
@@ -231,7 +358,7 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
     let end = 0;
     let selected = '';
 
-    if (viewMode === 'edit' && textareaRef.current) {
+    if (textareaRef.current) {
       start = textareaRef.current.selectionStart;
       end = textareaRef.current.selectionEnd;
       selected = content.slice(start, end);
@@ -245,17 +372,6 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
           selected = bounds.word;
           textareaRef.current.setSelectionRange(start, end);
           onSelectionChange(selected, start, end);
-        }
-      }
-    } else {
-      // In live view mode, read window selection
-      const winSelection = window.getSelection();
-      selected = winSelection ? winSelection.toString().trim() : '';
-      if (selected) {
-        const idx = content.indexOf(selected);
-        if (idx !== -1) {
-          start = idx;
-          end = idx + selected.length;
         }
       }
     }
@@ -413,7 +529,7 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
 
   // Render backdrop segments with subtle highlights for raw editor view
   const backdropElements = useMemo(() => {
-    if (sceneReferences.length === 0) return null;
+    if (!showHighlights || (sceneReferences.length === 0 && !focusedSuggestion)) return null;
 
     const nodes: React.ReactNode[] = [];
     let lastIdx = 0;
@@ -422,20 +538,35 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
       const ref = sceneReferences[i];
       if (ref.startIndex > lastIdx) {
         nodes.push(
-          <span key={`b-text-${lastIdx}`} className="opacity-0">
+          <span key={`b-text-${lastIdx}`} className="opacity-0 select-none">
             {content.substring(lastIdx, ref.startIndex)}
           </span>
         );
       }
 
       const isChar = ref.entry ? ref.entry.category === 'character' : ref.targetPath.includes('characters');
+      const isIdea = ref.entry ? ref.entry.category === 'idea' : (ref.targetPath.includes('scratchpad') || ref.targetPath.includes('ideas'));
+      const isFocused = focusedSuggestion && focusedSuggestion.startIndex <= ref.endIndex && focusedSuggestion.endIndex >= ref.startIndex;
+      const isCursorActive = activeCursorRef && activeCursorRef.startIndex === ref.startIndex;
+
       nodes.push(
         <span
-          key={`b-ref-${ref.startIndex}`}
-          className={`rounded border-b px-0.5 select-none ${
-            isChar
-              ? 'bg-amber-500/20 border-amber-400/70 text-transparent'
-              : 'bg-cyan-500/20 border-cyan-400/70 text-transparent'
+          key={`b-ref-${ref.startIndex}-${ref.endIndex}`}
+          id={`lore-highlight-${ref.startIndex}`}
+          data-start={ref.startIndex}
+          data-end={ref.endIndex}
+          className={`rounded-xs border-b-2 transition-colors select-none font-medium ${
+            isFocused
+              ? 'bg-amber-400/40 border-amber-300 text-transparent animate-pulse ring-2 ring-amber-400/50'
+              : isCursorActive
+              ? isChar
+                ? 'bg-amber-500/40 border-amber-300 text-transparent ring-1 ring-amber-400/60'
+                : 'bg-cyan-500/40 border-cyan-300 text-transparent ring-1 ring-cyan-400/60'
+              : isChar
+              ? 'bg-amber-500/25 border-amber-400 text-transparent hover:bg-amber-500/35'
+              : isIdea
+              ? 'bg-purple-500/25 border-purple-400 text-transparent hover:bg-purple-500/35'
+              : 'bg-cyan-500/25 border-cyan-400 text-transparent hover:bg-cyan-500/35'
           }`}
         >
           {ref.raw}
@@ -447,14 +578,14 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
 
     if (lastIdx < content.length) {
       nodes.push(
-        <span key={`b-tail`} className="opacity-0">
+        <span key={`b-tail`} className="opacity-0 select-none">
           {content.substring(lastIdx)}
         </span>
       );
     }
 
     return nodes;
-  }, [content, sceneReferences]);
+  }, [content, sceneReferences, focusedSuggestion, showHighlights, activeCursorRef]);
 
   return (
     <div
@@ -531,40 +662,19 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
             </span>
           )}
 
-          {/* Mode Switcher: Edit vs Live & Lore */}
-          <div className="flex bg-stone-950 p-0.5 rounded border border-stone-800 ml-2">
-            <button
-              type="button"
-              onClick={() => setViewMode('edit')}
-              className={`px-2 py-0.5 text-xs rounded transition flex items-center gap-1 ${
-                viewMode === 'edit'
-                  ? 'bg-stone-800 text-stone-100 font-medium'
-                  : 'text-stone-400 hover:text-stone-200'
-              }`}
-              title="Markdown text editing mode"
-            >
-              <Edit3 className="w-3 h-3" />
-              <span>Edit</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('live')}
-              className={`px-2 py-0.5 text-xs rounded transition flex items-center gap-1 ${
-                viewMode === 'live'
-                  ? 'bg-amber-950/70 text-amber-200 font-medium border border-amber-800/60'
-                  : 'text-stone-400 hover:text-stone-200'
-              }`}
-              title="Interactive Lore & character view with tooltips"
-            >
-              <Sparkles className="w-3 h-3 text-amber-400" />
-              <span>Live & Lore</span>
-              {sceneReferences.length > 0 && (
-                <span className="ml-0.5 px-1 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-mono">
-                  {sceneReferences.length}
-                </span>
-              )}
-            </button>
-          </div>
+          {/* Highlight Visibility Toggle */}
+          <button
+            type="button"
+            onClick={() => setShowHighlights((prev) => !prev)}
+            className={`ml-2 p-1 rounded text-xs transition border ${
+              showHighlights
+                ? 'bg-stone-800 hover:bg-stone-700 text-stone-300 border-stone-700/60'
+                : 'bg-stone-900 text-stone-500 border-stone-800 hover:text-stone-400'
+            }`}
+            title={showHighlights ? 'Lore highlights are visible (click to hide)' : 'Lore highlights hidden (click to show)'}
+          >
+            {showHighlights ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+          </button>
 
           {isSaving ? (
             <span className="text-xs text-amber-500 animate-pulse flex items-center gap-1 ml-1">
@@ -662,6 +772,136 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
         </div>
       )}
 
+      {/* Active Cursor Lore Inspector Banner */}
+      {activeCursorRef && (
+        <div className="bg-stone-900 border-b border-amber-800/60 px-4 py-2 flex items-center justify-between text-xs text-stone-200 flex-shrink-0 animate-in fade-in duration-150">
+          <div className="flex items-center space-x-2 truncate">
+            {activeCursorRef.entry?.category === 'character' ? (
+              <User className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+            ) : (
+              <Compass className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
+            )}
+            <span className="font-semibold text-amber-300">
+              {activeCursorRef.entry?.name || activeCursorRef.anchorText}
+            </span>
+            <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-stone-800 text-stone-400 border border-stone-700/60">
+              {activeCursorRef.entry?.category || 'lore'}
+            </span>
+            {activeCursorRef.entry?.summary && (
+              <span className="text-stone-400 text-[11px] truncate hidden md:inline max-w-sm">
+                — {activeCursorRef.entry.summary}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center space-x-1.5 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                if (onOpenFile) {
+                  onOpenFile(activeCursorRef.entry?.path || activeCursorRef.targetPath);
+                }
+              }}
+              className="px-2 py-1 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded text-[11px] flex items-center gap-1 transition border border-stone-700/60"
+              title="Open profile in Story Bible"
+            >
+              <ExternalLink className="w-3 h-3 text-amber-400" />
+              <span>View in Bible</span>
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                setContextMenu({
+                  isOpen: true,
+                  x: rect.left,
+                  y: rect.bottom + 4,
+                  selectedText: activeCursorRef.anchorText,
+                  startIndex: activeCursorRef.startIndex,
+                  endIndex: activeCursorRef.endIndex,
+                  existingReference: activeCursorRef,
+                });
+              }}
+              className="px-2 py-1 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded text-[11px] flex items-center gap-1 transition border border-stone-700/60"
+              title="Change or reassign reference"
+            >
+              <Edit3 className="w-3 h-3 text-cyan-400" />
+              <span>Change</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleUnlinkLoreDirect(activeCursorRef.startIndex, activeCursorRef.endIndex)}
+              className="px-2 py-1 bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 rounded text-[11px] flex items-center gap-1 transition border border-rose-800/60"
+              title="Remove lore assignment from this text"
+            >
+              <Unlink className="w-3 h-3" />
+              <span>Unlink</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveCursorRef(null)}
+              className="p-1 hover:bg-stone-800 rounded text-stone-400 hover:text-stone-200 transition"
+              title="Dismiss inspector"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Selected Text Assignment Bar (when text is highlighted and not already on an active reference) */}
+      {selectedRange && !activeCursorRef && (
+        <div className="bg-stone-950/90 border-b border-amber-900/60 px-4 py-1.5 flex items-center justify-between text-xs text-stone-300 flex-shrink-0 animate-in fade-in duration-150">
+          <div className="flex items-center space-x-2 truncate">
+            <Tag className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+            <span className="text-stone-400">Selected:</span>
+            <span className="bg-stone-900 px-1.5 py-0.5 rounded font-serif italic text-amber-200 border border-stone-800 truncate max-w-xs">
+              "{selectedRange.text.length > 50 ? selectedRange.text.slice(0, 50) + '...' : selectedRange.text}"
+            </span>
+          </div>
+
+          <div className="flex items-center space-x-1.5 flex-shrink-0">
+            <button
+              type="button"
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                setContextMenu({
+                  isOpen: true,
+                  x: rect.left,
+                  y: rect.bottom + 4,
+                  selectedText: selectedRange.text,
+                  startIndex: selectedRange.start,
+                  endIndex: selectedRange.end,
+                  existingReference: selectedRange.existingRef || null,
+                });
+              }}
+              className="px-2 py-1 bg-amber-950/70 hover:bg-amber-900/80 text-amber-200 border border-amber-800/60 rounded text-[11px] font-medium flex items-center gap-1 transition"
+            >
+              <UserPlus className="w-3 h-3 text-amber-400" />
+              <span>Assign Character / Lore</span>
+            </button>
+            {!isCharacterOrWorld && (
+              <button
+                type="button"
+                onClick={() => handleOpenGenerateContent(selectedRange.text, selectedRange.start, selectedRange.end)}
+                className="px-2 py-1 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded text-[11px] flex items-center gap-1 transition border border-stone-700/60"
+              >
+                <Sparkles className="w-3 h-3 text-amber-400" />
+                <span>AI Draft</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setSelectedRange(null)}
+              className="p-1 hover:bg-stone-800 rounded text-stone-400 hover:text-stone-200 transition"
+              title="Dismiss"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Scene Lore & Characters Bar (Interactive Pills) */}
       {uniqueReferencedEntries.length > 0 && (
         <div className="bg-stone-950/50 border-b border-stone-800/80 px-4 py-1.5 flex items-center space-x-2 text-xs overflow-x-auto flex-shrink-0">
@@ -672,48 +912,65 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
             {uniqueReferencedEntries.map(({ entry, ref, count }) => {
               const isChar = entry ? entry.category === 'character' : ref.targetPath.includes('characters');
               return (
-                <button
+                <div
                   key={ref.targetPath}
-                  type="button"
-                  onMouseEnter={(e) => {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    setHoverTooltip({
-                      entry: entry || null,
-                      anchorText: ref.anchorText,
-                      targetPath: ref.targetPath,
-                      position: { x: rect.left, y: rect.bottom },
-                    });
-                  }}
-                  onMouseLeave={() => setHoverTooltip(null)}
-                  onClick={() => {
-                    if (onOpenFile) {
-                      onOpenFile(entry?.path || ref.targetPath);
-                    }
-                  }}
-                  className={`px-2 py-0.5 rounded flex items-center gap-1 text-[11px] border transition flex-shrink-0 ${
+                  className={`inline-flex items-center rounded text-[11px] border transition flex-shrink-0 ${
                     isChar
                       ? 'bg-amber-950/50 text-amber-300 border-amber-800/60 hover:bg-amber-900/60'
                       : 'bg-cyan-950/50 text-cyan-300 border-cyan-800/60 hover:bg-cyan-900/60'
                   }`}
-                  title="Hover for summary, click to view in Story Bible"
                 >
-                  {isChar ? (
-                    <User className="w-3 h-3 text-amber-400" />
-                  ) : (
-                    <Compass className="w-3 h-3 text-cyan-400" />
-                  )}
-                  <span>{entry?.name || ref.anchorText}</span>
-                  {count > 1 && (
-                    <span className="text-[9px] opacity-70 font-mono">×{count}</span>
-                  )}
-                </button>
+                  <button
+                    type="button"
+                    onMouseEnter={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setHoverTooltip({
+                        entry: entry || null,
+                        anchorText: ref.anchorText,
+                        targetPath: ref.targetPath,
+                        startIndex: ref.startIndex,
+                        endIndex: ref.endIndex,
+                        position: { x: rect.left, y: rect.bottom },
+                      });
+                    }}
+                    onMouseLeave={() => {
+                      setTimeout(() => {
+                        if (!isHoveringTooltipRef.current) setHoverTooltip(null);
+                      }, 150);
+                    }}
+                    onClick={() => handleLocateReference(ref)}
+                    className="px-2 py-0.5 flex items-center gap-1"
+                    title="Click to jump to reference in text, hover for summary"
+                  >
+                    {isChar ? (
+                      <User className="w-3 h-3 text-amber-400" />
+                    ) : (
+                      <Compass className="w-3 h-3 text-cyan-400" />
+                    )}
+                    <span>{entry?.name || ref.anchorText}</span>
+                    {count > 1 && (
+                      <span className="text-[9px] opacity-70 font-mono">×{count}</span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleUnlinkLoreDirect(ref.startIndex, ref.endIndex);
+                    }}
+                    className="px-1 py-0.5 hover:bg-rose-900/60 text-stone-400 hover:text-rose-200 border-l border-stone-800/60 rounded-r transition"
+                    title={`Unlink ${entry?.name || ref.anchorText}`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
               );
             })}
           </div>
         </div>
       )}
 
-      {/* Editor Body */}
+      {/* Editor Body with Integrated Live Highlights and Textarea */}
       <div className="flex-1 relative flex flex-col p-4 overflow-hidden">
         {isLoadingCurrentScene && (
           <div
@@ -730,67 +987,47 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
           </div>
         )}
 
-        {viewMode === 'edit' ? (
-          <div className="relative w-full h-full">
-            {/* Synchronized highlight backdrop */}
-            <div
-              ref={backdropRef}
-              aria-hidden="true"
-              className="absolute inset-0 pointer-events-none overflow-hidden font-serif text-base leading-relaxed tracking-wide select-none whitespace-pre-wrap break-words"
-            >
-              {backdropElements}
-            </div>
+        <div className="relative w-full h-full">
+          {/* Synchronized highlight backdrop */}
+          <div
+            ref={backdropRef}
+            aria-hidden="true"
+            className="absolute inset-0 pointer-events-none overflow-hidden font-serif text-base leading-relaxed tracking-wide select-none whitespace-pre-wrap break-words"
+          >
+            {backdropElements}
+          </div>
 
-            {/* Editable Textarea */}
-            <textarea
-              ref={textareaRef}
-              value={content}
-              onChange={(e) => onChange(e.target.value)}
-              onSelect={handleSelect}
-              onKeyUp={handleSelect}
-              onScroll={handleScroll}
-              placeholder="Start writing your scene in Markdown... Select any text and right-click to reference characters or lore."
-              spellCheck={false}
-              className="w-full h-full bg-transparent resize-none border-none outline-none font-serif text-stone-200 text-base leading-relaxed tracking-wide placeholder-stone-600 focus:ring-0 overflow-y-auto relative z-10"
-            />
-          </div>
-        ) : (
-          /* Live & Lore Interactive Mode */
-          <div className="w-full h-full overflow-y-auto pr-2 text-stone-200 text-base font-serif leading-relaxed">
-            <LoreTextRenderer
-              text={content}
-              entries={loreEntries}
-              onHoverReference={(ref, pos) => {
-                setHoverTooltip({
-                  entry: ref.entry || null,
-                  anchorText: ref.anchorText,
-                  targetPath: ref.targetPath,
-                  position: pos,
-                });
-              }}
-              onLeaveReference={() => setHoverTooltip(null)}
-              onClickReference={(ref) => {
-                if (onOpenFile) {
-                  onOpenFile(ref.entry?.path || ref.targetPath);
-                }
-              }}
-              focusedSuggestion={focusedSuggestion}
-            />
-          </div>
-        )}
+          {/* Editable Textarea */}
+          <textarea
+            ref={textareaRef}
+            value={content}
+            onChange={(e) => onChange(e.target.value)}
+            onSelect={handleSelect}
+            onKeyUp={handleSelect}
+            onClick={handleTextareaClick}
+            onMouseMove={handleTextareaMouseMove}
+            onMouseLeave={handleTextareaMouseLeave}
+            onScroll={handleScroll}
+            placeholder="Start writing your scene in Markdown... Select any text and right-click to reference characters or lore."
+            spellCheck={false}
+            className="w-full h-full bg-transparent resize-none border-none outline-none font-serif text-stone-200 text-base leading-relaxed tracking-wide placeholder-stone-600 focus:ring-0 overflow-y-auto relative z-10"
+          />
+        </div>
       </div>
 
       {/* Footer Info */}
       <div className="h-8 border-t border-stone-800/60 px-4 flex items-center justify-between text-xs text-stone-500 bg-stone-950/20 flex-shrink-0">
         <span>
           {isCharacterOrWorld
-            ? `${documentCategory === 'character' ? 'Character Story Bible profile' : 'World & Lore Story Bible entry'} • Suggestions & AI editorial features disabled`
+            ? `${documentCategory === 'character' ? 'Character Story Bible profile' : 'World & Lore Story Bible entry'} • Live Lore active`
             : sceneReferences.length > 0
-            ? `${sceneReferences.length} lore reference${sceneReferences.length === 1 ? '' : 's'} linked • Right-click text to link`
-            : 'Select text and right-click to reference characters & lore'}
+            ? `${sceneReferences.length} lore reference${sceneReferences.length === 1 ? '' : 's'} linked • Hover highlights or select text to manage`
+            : 'Select text or right-click to reference characters & lore'}
         </span>
-        <span>
-          {viewMode === 'live' ? 'Interactive view active' : 'Markdown editor active'}
+        <span className="flex items-center gap-2">
+          <span className="text-amber-500/80 flex items-center gap-1 font-mono text-[11px]">
+            <Sparkles className="w-3 h-3 text-amber-400" /> Live Editor
+          </span>
         </span>
       </div>
 
@@ -804,6 +1041,14 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
           onOpenEntry={(path) => {
             setHoverTooltip(null);
             if (onOpenFile) onOpenFile(path);
+          }}
+          onUnlink={() => handleUnlinkLoreDirect(hoverTooltip.startIndex, hoverTooltip.endIndex)}
+          onMouseEnter={() => {
+            isHoveringTooltipRef.current = true;
+          }}
+          onMouseLeave={() => {
+            isHoveringTooltipRef.current = false;
+            setHoverTooltip(null);
           }}
         />
       )}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Compass, ExternalLink, Lightbulb } from 'lucide-react';
+import { User, Compass, ExternalLink, Lightbulb, Unlink } from 'lucide-react';
 import { LoreEntry } from '../../engine/lore/loreReference.ts';
 
 interface LoreHoverTooltipProps {
@@ -8,6 +8,9 @@ interface LoreHoverTooltipProps {
   targetPath: string;
   position: { x: number; y: number };
   onOpenEntry?: (path: string) => void;
+  onUnlink?: () => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }
 
 export const LoreHoverTooltip: React.FC<LoreHoverTooltipProps> = ({
@@ -16,6 +19,9 @@ export const LoreHoverTooltip: React.FC<LoreHoverTooltipProps> = ({
   targetPath,
   position,
   onOpenEntry,
+  onUnlink,
+  onMouseEnter,
+  onMouseLeave,
 }) => {
   const isCharacter = entry ? entry.category === 'character' : targetPath.includes('characters');
   const isIdea = entry ? entry.category === 'idea' : (targetPath.includes('scratchpad') || targetPath.includes('ideas'));
@@ -31,6 +37,8 @@ export const LoreHoverTooltip: React.FC<LoreHoverTooltipProps> = ({
       className="fixed z-50 pointer-events-auto shadow-2xl rounded-lg border border-stone-700/80 bg-stone-900/95 backdrop-blur-md p-3.5 w-72 text-xs select-none transition-all duration-150 animate-in fade-in zoom-in-95"
       style={{ left: `${left}px`, top: `${top}px` }}
       onClick={(e) => e.stopPropagation()}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
       {/* Header */}
       <div className="flex items-center justify-between pb-2 mb-2 border-b border-stone-800">
@@ -104,21 +112,37 @@ export const LoreHoverTooltip: React.FC<LoreHoverTooltipProps> = ({
         </div>
       )}
 
-      {/* Footer link to bible file */}
+      {/* Footer links: Bible file & Unlink action */}
       <div className="pt-2 border-t border-stone-800 flex items-center justify-between text-[10px] text-stone-500">
-        <span className="font-mono truncate max-w-[150px]">{entry?.filename || targetPath}</span>
-        {onOpenEntry && (
-          <button
-            type="button"
-            onClick={() => onOpenEntry(entry?.path || targetPath)}
-            className={`flex items-center gap-1 transition hover:underline font-medium ml-2 ${
-              isIdea ? 'text-purple-300 hover:text-purple-200' : 'text-amber-400 hover:text-amber-300'
-            }`}
-          >
-            <span>{isIdea ? 'Open & Edit Idea' : 'Open Entry'}</span>
-            <ExternalLink className="w-3 h-3" />
-          </button>
-        )}
+        <span className="font-mono truncate max-w-[110px]">{entry?.filename || targetPath}</span>
+        <div className="flex items-center space-x-1.5 ml-2 flex-shrink-0">
+          {onUnlink && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onUnlink();
+              }}
+              className="flex items-center gap-1 text-rose-400 hover:text-rose-300 bg-rose-950/40 hover:bg-rose-900/50 px-1.5 py-0.5 rounded border border-rose-800/40 transition font-medium"
+              title="Remove character/lore assignment"
+            >
+              <Unlink className="w-2.5 h-2.5" />
+              <span>Unlink</span>
+            </button>
+          )}
+          {onOpenEntry && (
+            <button
+              type="button"
+              onClick={() => onOpenEntry(entry?.path || targetPath)}
+              className={`flex items-center gap-1 transition hover:underline font-medium ${
+                isIdea ? 'text-purple-300 hover:text-purple-200' : 'text-amber-400 hover:text-amber-300'
+              }`}
+            >
+              <span>{isIdea ? 'Open Idea' : 'Open Entry'}</span>
+              <ExternalLink className="w-2.5 h-2.5" />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
