@@ -392,7 +392,7 @@ export function extractCoverTheme(imageSrc?: string): Promise<CoverTheme> {
  * Applies the cover theme to the document via CSS custom properties.
  * If theme is null, removes custom properties to restore default StorySpark styling.
  */
-export function applyThemeToDocument(theme: CoverTheme | null): void {
+export function applyThemeToDocument(theme: CoverTheme | null, isLightMode?: boolean): void {
   if (typeof document === 'undefined') return;
 
   const root = document.documentElement;
@@ -420,23 +420,31 @@ export function applyThemeToDocument(theme: CoverTheme | null): void {
     root.style.setProperty(`--theme-amber-${step}`, theme.paletteRgb[step]);
   });
 
+  const effectiveLightMode = isLightMode !== undefined ? isLightMode : root.dataset.theme === 'light';
+
   // Additional atmospheric design tokens
   root.style.setProperty('--theme-primary-hex', theme.primaryHex);
   root.style.setProperty('--theme-secondary-hex', theme.secondaryHex);
   root.style.setProperty('--theme-accent-hex', theme.accentHex);
-  root.style.setProperty('--theme-ambient-bg', theme.ambientBgHex);
+  root.style.setProperty('--theme-ambient-bg', effectiveLightMode ? '#fafaf9' : theme.ambientBgHex);
   root.style.setProperty('--theme-selection-bg', theme.paletteHex[600]);
   root.style.setProperty(
     '--theme-ambient-glow',
-    `radial-gradient(circle at 50% -10%, rgba(${theme.paletteRgb[500]}, 0.14) 0%, transparent 65%)`
+    effectiveLightMode
+      ? `radial-gradient(circle at 50% -10%, rgba(${theme.paletteRgb[500]}, 0.08) 0%, transparent 65%)`
+      : `radial-gradient(circle at 50% -10%, rgba(${theme.paletteRgb[500]}, 0.14) 0%, transparent 65%)`
   );
   root.style.setProperty(
     '--theme-ambient-subtle',
-    `rgba(${theme.paletteRgb[500]}, 0.08)`
+    effectiveLightMode
+      ? `rgba(${theme.paletteRgb[500]}, 0.04)`
+      : `rgba(${theme.paletteRgb[500]}, 0.08)`
   );
   root.style.setProperty(
     '--theme-border-accent',
-    `rgba(${theme.paletteRgb[500]}, 0.35)`
+    effectiveLightMode
+      ? `rgba(${theme.paletteRgb[500]}, 0.45)`
+      : `rgba(${theme.paletteRgb[500]}, 0.35)`
   );
 
   root.dataset.novelThemeActive = 'true';

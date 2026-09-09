@@ -1,18 +1,21 @@
 import React from 'react';
 
 interface AppLogoProps {
+  id?: string;
   className?: string;
   size?: number;
   color?: string;
 }
 
 export const AppLogo: React.FC<AppLogoProps> = ({
+  id,
   className = 'w-6 h-6',
   size,
   color = 'currentColor',
 }) => {
   return (
     <svg
+      id={id}
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 600 500"
       width={size}

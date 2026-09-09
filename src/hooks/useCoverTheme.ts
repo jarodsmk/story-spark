@@ -4,9 +4,14 @@ import { extractCoverTheme, applyThemeToDocument } from '../engine/theme/coverTh
 
 interface UseCoverThemeOptions {
   onSaveTheme?: (novelId: string, theme: CoverTheme) => Promise<void>;
+  isLightMode?: boolean;
 }
 
-export function useCoverTheme(activeNovel?: Novel | null, options?: UseCoverThemeOptions) {
+export function useCoverTheme(
+  activeNovel?: Novel | null,
+  options?: UseCoverThemeOptions,
+  isLightModeProp?: boolean
+) {
   const [currentTheme, setCurrentTheme] = useState<CoverTheme | null>(null);
   const [isExtracting, setIsExtracting] = useState<boolean>(false);
   const lastProcessedCoverRef = useRef<string | null>(null);
@@ -14,11 +19,19 @@ export function useCoverTheme(activeNovel?: Novel | null, options?: UseCoverThem
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
+  const isLightMode = isLightModeProp !== undefined ? isLightModeProp : options?.isLightMode;
+
   const novelId = activeNovel?.id || null;
   const coverImage = activeNovel?.coverImage || null;
   const coverThemeKey = activeNovel?.coverTheme
     ? `${activeNovel.coverTheme.primaryHex}_${activeNovel.coverTheme.accentHex}`
     : '';
+
+  useEffect(() => {
+    if (currentTheme) {
+      applyThemeToDocument(currentTheme, isLightMode);
+    }
+  }, [isLightMode, currentTheme]);
 
   useEffect(() => {
     let isMounted = true;
@@ -29,7 +42,7 @@ export function useCoverTheme(activeNovel?: Novel | null, options?: UseCoverThem
       lastProcessedCoverRef.current = null;
       lastNovelIdRef.current = activeNovel?.id || null;
       setCurrentTheme((prev) => (prev !== null ? null : prev));
-      applyThemeToDocument(null);
+      applyThemeToDocument(null, isLightMode);
       return;
     }
 
@@ -39,7 +52,7 @@ export function useCoverTheme(activeNovel?: Novel | null, options?: UseCoverThem
     // If novel has coverTheme stored and the coverImage hasn't changed
     if (activeNovel.coverTheme && lastProcessedCoverRef.current === currentCoverImage && lastNovelIdRef.current === currentNovelId) {
       setCurrentTheme((prev) => (prev?.primaryHex === activeNovel.coverTheme?.primaryHex ? prev : activeNovel.coverTheme!));
-      applyThemeToDocument(activeNovel.coverTheme);
+      applyThemeToDocument(activeNovel.coverTheme, isLightMode);
       return;
     }
 
@@ -48,7 +61,7 @@ export function useCoverTheme(activeNovel?: Novel | null, options?: UseCoverThem
       lastProcessedCoverRef.current = currentCoverImage;
       lastNovelIdRef.current = currentNovelId;
       setCurrentTheme((prev) => (prev?.primaryHex === activeNovel.coverTheme?.primaryHex ? prev : activeNovel.coverTheme!));
-      applyThemeToDocument(activeNovel.coverTheme);
+      applyThemeToDocument(activeNovel.coverTheme, isLightMode);
       return;
     }
 
@@ -61,7 +74,7 @@ export function useCoverTheme(activeNovel?: Novel | null, options?: UseCoverThem
       .then((theme) => {
         if (!isMounted) return;
         setCurrentTheme(theme);
-        applyThemeToDocument(theme);
+        applyThemeToDocument(theme, isLightMode);
         // Persist theme to database for instant future switches
         if (optionsRef.current?.onSaveTheme) {
           optionsRef.current.onSaveTheme(currentNovelId, theme).catch((err) => {
@@ -73,7 +86,7 @@ export function useCoverTheme(activeNovel?: Novel | null, options?: UseCoverThem
         console.warn('Theme extraction failed:', err);
         if (isMounted) {
           setCurrentTheme(null);
-          applyThemeToDocument(null);
+          applyThemeToDocument(null, isLightMode);
         }
       })
       .finally(() => {
@@ -83,7 +96,7 @@ export function useCoverTheme(activeNovel?: Novel | null, options?: UseCoverThem
     return () => {
       isMounted = false;
     };
-  }, [novelId, coverImage, coverThemeKey]);
+  }, [novelId, coverImage, coverThemeKey, isLightMode]);
 
   // Clean up on unmount
   useEffect(() => {

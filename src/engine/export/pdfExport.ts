@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { sanitizeFilename } from '../markdown/index.ts';
+import { AuthorProfile } from '../../types/index.ts';
 
 export interface PDFExportScene {
   id?: string;
@@ -19,6 +20,8 @@ export interface PDFExportOptions {
   title: string;
   genre?: string;
   author?: string;
+  authorProfile?: AuthorProfile;
+  includeAuthorInfo?: boolean;
   scenes: PDFExportScene[];
   bibleEntities?: PDFExportBibleEntity[];
   includeBibleAppendix?: boolean;
@@ -118,11 +121,12 @@ export function generateNovelPDF(options: PDFExportOptions): jsPDF {
       titleY += 20;
     }
 
-    if (author) {
+    const authorDisplayName = options.authorProfile?.penName || options.authorProfile?.name || author;
+    if (authorDisplayName) {
       doc.setFont(fontFamily, 'normal');
       doc.setFontSize(14);
       doc.setTextColor(60, 60, 60);
-      doc.text(`By ${author}`, pageWidth / 2, titleY + 10, { align: 'center' });
+      doc.text(`By ${authorDisplayName}`, pageWidth / 2, titleY + 10, { align: 'center' });
     }
 
     // Cover Page Footer info
@@ -136,7 +140,14 @@ export function generateNovelPDF(options: PDFExportOptions): jsPDF {
       pageHeight - 70,
       { align: 'center' }
     );
-    doc.text('Compiled with StorySpark Studio', pageWidth / 2, pageHeight - 54, { align: 'center' });
+    if (options.authorProfile?.copyrightNotice) {
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(options.authorProfile.copyrightNotice, pageWidth / 2, pageHeight - 54, { align: 'center' });
+      doc.text('Compiled with StorySpark Studio', pageWidth / 2, pageHeight - 40, { align: 'center' });
+    } else {
+      doc.text('Compiled with StorySpark Studio', pageWidth / 2, pageHeight - 54, { align: 'center' });
+    }
 
     // Next page for chapters
     doc.addPage();
@@ -281,7 +292,79 @@ export function generateNovelPDF(options: PDFExportOptions): jsPDF {
     }
   }
 
-  // 4. Running headers and footers across all pages
+  // 4. About the Author Page
+  const prof = options.authorProfile;
+  const authorDisplayName = prof?.penName || prof?.name || author;
+  const shouldIncludeAuthor = options.includeAuthorInfo ?? Boolean(prof?.bio || prof?.name);
+
+  if (shouldIncludeAuthor && (prof || authorDisplayName)) {
+    doc.addPage();
+    currentPageNumber++;
+    y = margin + 36;
+
+    doc.setFont(fontFamily, 'bold');
+    doc.setFontSize(22);
+    doc.setTextColor(30, 30, 30);
+    doc.text('About the Author', pageWidth / 2, y, { align: 'center' });
+    y += 16;
+
+    // Decorative rule
+    doc.setDrawColor(180, 150, 100);
+    doc.setLineWidth(1.25);
+    doc.line(pageWidth / 2 - 60, y, pageWidth / 2 + 60, y);
+    y += 28;
+
+    if (authorDisplayName) {
+      doc.setFont(fontFamily, 'bold');
+      doc.setFontSize(15);
+      doc.setTextColor(40, 40, 40);
+      doc.text(authorDisplayName, pageWidth / 2, y, { align: 'center' });
+      y += 20;
+    }
+
+    if (prof?.location) {
+      doc.setFont(fontFamily, 'italic');
+      doc.setFontSize(11);
+      doc.setTextColor(110, 110, 110);
+      doc.text(prof.location, pageWidth / 2, y, { align: 'center' });
+      y += 24;
+    }
+
+    if (prof?.bio) {
+      doc.setFont(fontFamily, 'normal');
+      doc.setFontSize(11);
+      doc.setTextColor(50, 50, 50);
+      const cleanBio = cleanProseForExport(prof.bio);
+      const bioLines = doc.splitTextToSize(cleanBio, contentWidth - 40);
+      doc.text(bioLines, margin + 20, y);
+      y += bioLines.length * 16 + 24;
+    }
+
+    const links: string[] = [];
+    if (prof?.website) links.push(`Website: ${prof.website}`);
+    if (prof?.email) links.push(`Contact: ${prof.email}`);
+    if (prof?.socialHandle) links.push(`Social: ${prof.socialHandle}`);
+
+    if (links.length > 0) {
+      doc.setFont(fontFamily, 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(100, 100, 100);
+      for (const link of links) {
+        doc.text(link, pageWidth / 2, y, { align: 'center' });
+        y += 15;
+      }
+      y += 10;
+    }
+
+    if (prof?.copyrightNotice) {
+      doc.setFont(fontFamily, 'italic');
+      doc.setFontSize(8.5);
+      doc.setTextColor(140, 140, 140);
+      doc.text(prof.copyrightNotice, pageWidth / 2, y, { align: 'center' });
+    }
+  }
+
+  // 5. Running headers and footers across all pages
   const totalPages = doc.getNumberOfPages();
   const startPage = includeCoverPage ? 2 : 1;
 

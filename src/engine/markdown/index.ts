@@ -1,4 +1,4 @@
-import { SceneDocument, BibleEntity } from '../../types/index.ts';
+import { SceneDocument, BibleEntity, AuthorProfile } from '../../types/index.ts';
 
 /**
  * Sanitizes a filename to ensure safe storage on Windows, Linux, and macOS.
@@ -72,6 +72,9 @@ export interface CompileOptions {
   sceneSeparator?: 'divider' | 'asterisms' | 'blank';
   chapterHeadingStyle?: 'numbered' | 'original' | 'simple';
   novelTitle?: string;
+  author?: string;
+  authorProfile?: AuthorProfile;
+  includeAuthorInfo?: boolean;
 }
 
 /**
@@ -85,6 +88,19 @@ export function compileNovelManuscript(
 ): string {
   const sorted = [...scenes].sort((a, b) => a.order - b.order);
   let output = '';
+
+  const authorName = options?.authorProfile?.penName || options?.authorProfile?.name || options?.author;
+
+  if (options?.novelTitle) {
+    output += `# ${options.novelTitle}\n\n`;
+    if (authorName) {
+      output += `**By ${authorName}**\n\n`;
+    }
+    if (options?.authorProfile?.copyrightNotice) {
+      output += `*${options.authorProfile.copyrightNotice}*\n\n`;
+    }
+    output += `---\n\n`;
+  }
 
   const separatorStr = options?.sceneSeparator === 'asterisms'
     ? '\n\n* * *\n\n'
@@ -120,6 +136,34 @@ export function compileNovelManuscript(
     }
   }
 
+  // Include Author Profile section if enabled or if author info exists
+  const prof = options?.authorProfile;
+  const shouldIncludeAuthor = options?.includeAuthorInfo ?? Boolean(prof?.bio || prof?.name);
+  if (shouldIncludeAuthor && (prof || authorName)) {
+    output += `\n\n---\n\n# About the Author\n\n`;
+    if (authorName) {
+      output += `### ${authorName}\n\n`;
+    }
+    if (prof?.location) {
+      output += `*${prof.location}*\n\n`;
+    }
+    if (prof?.bio) {
+      output += `${prof.bio.trim()}\n\n`;
+    }
+    if (prof?.website) {
+      output += `- **Website:** ${prof.website}\n`;
+    }
+    if (prof?.email) {
+      output += `- **Contact:** ${prof.email}\n`;
+    }
+    if (prof?.socialHandle) {
+      output += `- **Social:** ${prof.socialHandle}\n`;
+    }
+    if (prof?.copyrightNotice) {
+      output += `\n*${prof.copyrightNotice}*\n`;
+    }
+  }
+
   return output.trim();
 }
 
@@ -135,9 +179,18 @@ export function compileNovelText(
   const sorted = [...scenes].sort((a, b) => a.order - b.order);
   let output = '';
 
+  const authorName = options?.authorProfile?.penName || options?.authorProfile?.name || options?.author;
+
   if (options?.novelTitle) {
     output += `${options.novelTitle.toUpperCase()}\n`;
-    output += `${'='.repeat(Math.min(60, options.novelTitle.length * 2))}\n\n\n`;
+    output += `${'='.repeat(Math.min(60, options.novelTitle.length * 2))}\n`;
+    if (authorName) {
+      output += `By ${authorName}\n`;
+    }
+    if (options?.authorProfile?.copyrightNotice) {
+      output += `${options.authorProfile.copyrightNotice}\n`;
+    }
+    output += `\n\n`;
   }
 
   const separatorStr = options?.sceneSeparator === 'asterisms'
@@ -189,6 +242,37 @@ export function compileNovelText(
         .replace(/\*\*([^*]+)\*\*/g, '$1')
         .replace(/\*([^*]+)\*/g, '$1');
       output += `${cleanEntity.trim()}\n\n`;
+    }
+  }
+
+  // Include Author Profile section if enabled or if author info exists
+  const prof = options?.authorProfile;
+  const shouldIncludeAuthor = options?.includeAuthorInfo ?? Boolean(prof?.bio || prof?.name);
+  if (shouldIncludeAuthor && (prof || authorName)) {
+    const headerName = authorName ? `: ${authorName.toUpperCase()}` : '';
+    output += `\n\n============================================================\n`;
+    output += `ABOUT THE AUTHOR${headerName}\n`;
+    output += `============================================================\n\n`;
+    if (authorName) {
+      output += `Author: ${authorName}\n`;
+    }
+    if (prof?.location) {
+      output += `Location: ${prof.location}\n`;
+    }
+    if (prof?.bio) {
+      output += `\n${prof.bio.trim()}\n\n`;
+    }
+    if (prof?.website) {
+      output += `Website: ${prof.website}\n`;
+    }
+    if (prof?.email) {
+      output += `Contact: ${prof.email}\n`;
+    }
+    if (prof?.socialHandle) {
+      output += `Social: ${prof.socialHandle}\n`;
+    }
+    if (prof?.copyrightNotice) {
+      output += `\n${prof.copyrightNotice}\n`;
     }
   }
 

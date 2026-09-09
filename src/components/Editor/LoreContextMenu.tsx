@@ -27,6 +27,7 @@ interface LoreContextMenuProps {
   onSelectReference: (targetPath: string) => void;
   onOpenNewModal: (category: 'character' | 'world') => void;
   onOpenGenerateContent?: (selectedText: string, startIndex: number, endIndex: number) => void;
+  onAIRewrite?: (instruction: string) => void;
   onUnlinkReference?: () => void;
   onOpenBibleFile?: (path: string) => void;
   onClose: () => void;
@@ -45,6 +46,7 @@ export const LoreContextMenu: React.FC<LoreContextMenuProps> = ({
   onSelectReference,
   onOpenNewModal,
   onOpenGenerateContent,
+  onAIRewrite,
   onUnlinkReference,
   onOpenBibleFile,
   onClose,
@@ -135,7 +137,7 @@ export const LoreContextMenu: React.FC<LoreContextMenuProps> = ({
       </div>
 
       {/* AI Generate Content Action */}
-      <div className="p-1.5 border-b border-stone-800 bg-amber-950/20">
+      <div className="p-1.5 border-b border-stone-800 bg-amber-950/20 space-y-1">
         <button
           type="button"
           onClick={() => {
@@ -163,6 +165,34 @@ export const LoreContextMenu: React.FC<LoreContextMenuProps> = ({
             AI
           </span>
         </button>
+
+        {onAIRewrite && selectedText.trim() && (
+          <button
+            type="button"
+            onClick={() => {
+              onAIRewrite('Polish and tighten prose while maintaining voice');
+              onClose();
+            }}
+            className="w-full text-left px-2.5 py-1.5 rounded-lg bg-stone-850 hover:bg-amber-950/40 text-stone-300 hover:text-amber-200 flex items-center justify-between transition border border-stone-700/60 group shadow-sm"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-md bg-amber-500/15 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform duration-150">
+                <Sparkles className="w-3.5 h-3.5" />
+              </div>
+              <div>
+                <div className="font-semibold text-xs text-stone-200 group-hover:text-amber-200 flex items-center gap-1.5">
+                  <span>Rewrite Selection with AI</span>
+                </div>
+                <div className="text-[10px] text-stone-400">
+                  Polish prose with connected LLM
+                </div>
+              </div>
+            </div>
+            <span className="text-[10px] font-mono font-medium uppercase bg-amber-500/10 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/20">
+              Rewrite
+            </span>
+          </button>
+        )}
       </div>
 
       {/* Existing reference actions if already linked */}

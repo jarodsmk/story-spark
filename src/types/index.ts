@@ -30,6 +30,18 @@ export interface UserRule {
   description: string;
 }
 
+export interface AuthorProfile {
+  name: string;
+  penName?: string;
+  bio?: string;
+  email?: string;
+  website?: string;
+  socialHandle?: string;
+  location?: string;
+  copyrightNotice?: string;
+  updatedAt?: number;
+}
+
 export interface IgnoredTerm {
   id: string;
   term: string;
@@ -109,6 +121,8 @@ export interface NovelCustomPrompts {
   editorialPass?: string;
   storySuggestions?: string;
 }
+
+export type ThemeMode = 'dark' | 'light';
 
 export type TailwindPaletteSteps = 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 950;
 

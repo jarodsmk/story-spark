@@ -270,7 +270,7 @@ export const SuggestionsPane: React.FC<SuggestionsPaneProps> = ({
 
   if (isCharacterOrWorld) {
     return (
-      <div className="flex flex-col h-full bg-stone-900 border-r border-stone-800">
+      <div className="flex flex-col h-full w-full bg-stone-900 border-r border-stone-800">
         {/* Pane Header */}
         <div className="h-12 border-b border-stone-800 px-3 sm:px-4 flex items-center justify-between bg-stone-950/40">
           <div className="flex items-center space-x-2 truncate">
@@ -327,7 +327,7 @@ export const SuggestionsPane: React.FC<SuggestionsPaneProps> = ({
   }
 
   return (
-    <div className="flex flex-col h-full bg-stone-900 border-r border-stone-800">
+    <div className="flex flex-col h-full w-full bg-stone-900 border-r border-stone-800">
       {/* Pane Header */}
       <div className="h-12 border-b border-stone-800 px-3 sm:px-4 flex items-center justify-between bg-stone-950/40">
         <div className="flex items-center space-x-2 truncate">

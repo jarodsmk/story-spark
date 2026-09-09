@@ -58,6 +58,9 @@ interface EditorContainerProps {
   documentCategory?: DocumentCategory;
   isLoadingCurrentScene?: boolean;
   sidebarWidth?: number;
+  diffPaneEnabled?: boolean;
+  flashRange?: { start: number; end: number; key: number } | null;
+  onTriggerFlash?: (start: number, end: number) => void;
 }
 
 export const EditorContainer: React.FC<EditorContainerProps> = ({
@@ -106,9 +109,26 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
   documentCategory = 'scene',
   isLoadingCurrentScene = false,
   sidebarWidth = 240,
+  diffPaneEnabled = true,
+  flashRange,
+  onTriggerFlash,
 }) => {
   const [selectedSuggestionId, setSelectedSuggestionId] = useState<string | null>(null);
   const [activeMobileTab, setActiveMobileTab] = useState<'editor' | 'suggestions' | 'preview'>('editor');
+
+  // Fallback away from diff tab if disabled while selected
+  useEffect(() => {
+    if (!diffPaneEnabled && activeMobileTab === 'preview') {
+      setActiveMobileTab('editor');
+    }
+  }, [diffPaneEnabled, activeMobileTab]);
+
+  // Dispatch a window resize event when diffPaneEnabled changes so layout and observers recalculate
+  useEffect(() => {
+    try {
+      window.dispatchEvent(new Event('resize'));
+    } catch {}
+  }, [diffPaneEnabled]);
   const [isMobileScreen, setIsMobileScreen] = useState<boolean>(() => {
     return typeof window !== 'undefined' && window.innerWidth < 768;
   });
@@ -167,7 +187,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
   const handleSuggestionsResize = (deltaX: number) => {
     const min = 220;
     const effectiveSidebar = isSidebarCollapsed ? 48 : sidebarWidth;
-    const effectivePreview = isDiffCollapsed ? 44 : previewWidth;
+    const effectivePreview = !diffPaneEnabled ? 0 : isDiffCollapsed ? 44 : previewWidth;
     const maxAvailable = Math.max(min, window.innerWidth - effectiveSidebar - effectivePreview - 320);
     const max = Math.min(550, maxAvailable);
     const newWidth = Math.max(min, Math.min(max, Math.round(initialSuggestionsWidthRef.current + deltaX)));
@@ -192,7 +212,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
     setSuggestionsWidth((prev) => {
       const min = 220;
       const effectiveSidebar = isSidebarCollapsed ? 48 : sidebarWidth;
-      const effectivePreview = isDiffCollapsed ? 44 : previewWidth;
+      const effectivePreview = !diffPaneEnabled ? 0 : isDiffCollapsed ? 44 : previewWidth;
       const maxAvailable = Math.max(min, window.innerWidth - effectiveSidebar - effectivePreview - 320);
       const max = Math.min(550, maxAvailable);
       const next = Math.max(min, Math.min(max, prev + step));
@@ -323,7 +343,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden h-full">
+    <div className="flex-1 flex flex-col overflow-hidden h-full w-full min-w-0">
       {/* Mobile Navigation & View Switcher Bar (Visible strictly below md breakpoint) */}
       <div
         id="mobile-editor-navbar"
@@ -377,29 +397,33 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
             )}
           </button>
 
-          <button
-            id="mobile-tab-preview"
-            type="button"
-            onClick={() => setActiveMobileTab('preview')}
-            className={`flex-1 py-1 px-2 rounded-md text-[11px] font-medium transition-all flex items-center justify-center gap-1 ${
-              activeMobileTab === 'preview'
-                ? 'bg-amber-950/90 text-amber-300 border border-amber-800/60 shadow-xs'
-                : 'text-stone-400 hover:text-stone-200'
-            }`}
-          >
-            <Columns className="w-3 h-3 text-amber-400" />
-            <span>Diff</span>
-          </button>
+          {diffPaneEnabled && (
+            <button
+              id="mobile-tab-preview"
+              type="button"
+              onClick={() => setActiveMobileTab('preview')}
+              className={`flex-1 py-1 px-2 rounded-md text-[11px] font-medium transition-all flex items-center justify-center gap-1 ${
+                activeMobileTab === 'preview'
+                  ? 'bg-amber-950/90 text-amber-300 border border-amber-800/60 shadow-xs'
+                  : 'text-stone-400 hover:text-stone-200'
+              }`}
+            >
+              <Columns className="w-3 h-3 text-amber-400" />
+              <span>Diff</span>
+            </button>
+          )}
         </div>
 
         {/* Word Count Badge */}
-        <div className="text-[10px] text-stone-400 font-mono flex-shrink-0 bg-stone-900 px-2 py-1 rounded border border-stone-800">
-          {wordCount}w
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <div className="text-[10px] text-stone-400 font-mono bg-stone-900 px-2 py-1 rounded border border-stone-800">
+            {wordCount}w
+          </div>
         </div>
       </div>
 
       {/* Main Responsive Panes View */}
-      <div className="flex-1 flex overflow-hidden min-h-0 w-full">
+      <div className="flex-1 flex overflow-hidden min-h-0 w-full min-w-0">
         {/* 1. Left Pane: Suggestions & Passes (Collapsible on desktop, full pane on mobile tab) */}
         <div
           style={
@@ -454,7 +478,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
         <div
           className={`
             ${activeMobileTab === 'editor' ? 'flex flex-1 w-full h-full' : 'hidden'}
-            md:flex flex-1 min-w-0 h-full
+            md:flex flex-1 flex-col min-w-0 h-full w-full
           `}
         >
           <SourcePane
@@ -493,11 +517,16 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
             isCharacterOrWorld={isCharacterOrWorld}
             documentCategory={documentCategory}
             isLoadingCurrentScene={isLoadingCurrentScene}
+            diffPaneEnabled={diffPaneEnabled}
+            flashRange={flashRange}
+            onTriggerFlash={onTriggerFlash}
+            onAIRewrite={onAIRewrite}
+            isGeneratingAI={isGeneratingAI}
           />
         </div>
 
         {/* Resizer between Source Pane and Preview/Diff Pane */}
-        {!isDiffCollapsed && (
+        {diffPaneEnabled && !isDiffCollapsed && (
           <PanelResizer
             id="preview-pane-resizer"
             label="Accepted Result & Diff Pane"
@@ -510,36 +539,38 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
         )}
 
         {/* 3. Right Pane: Accepted Result & Diff (Collapsible on desktop, full pane on mobile tab) */}
-        <div
-          style={
-            !isMobileScreen && !isDiffCollapsed
-              ? { width: `${previewWidth}px` }
-              : undefined
-          }
-          className={`
-            ${activeMobileTab === 'preview' ? 'flex flex-1 w-full h-full' : 'hidden'}
-            md:flex
-            ${isDiffCollapsed ? 'md:w-11' : ''}
-            h-full flex-shrink-0 ${isDiffDragging ? 'transition-none' : 'transition-all duration-150'}
-          `}
-        >
-          <PreviewPane
-            currentText={content}
-            originalText={baselineContent}
-            onUndo={onUndo}
-            onRedo={onRedo}
-            canUndo={canUndo}
-            canRedo={canRedo}
-            onExport={onExport}
-            focusedSuggestion={focusedSuggestion}
-            isCollapsed={isMobileScreen ? false : isDiffCollapsed}
-            onToggleCollapse={handleToggleDiffCollapse}
-            loreEntries={loreEntries}
-            onOpenFile={onOpenFile}
-            isCharacterOrWorld={isCharacterOrWorld}
-            documentCategory={documentCategory}
-          />
-        </div>
+        {diffPaneEnabled && (
+          <div
+            style={
+              !isMobileScreen && !isDiffCollapsed
+                ? { width: `${previewWidth}px` }
+                : undefined
+            }
+            className={`
+              ${activeMobileTab === 'preview' ? 'flex flex-1 w-full h-full' : 'hidden'}
+              md:flex
+              ${isDiffCollapsed ? 'md:w-11' : ''}
+              h-full flex-shrink-0 ${isDiffDragging ? 'transition-none' : 'transition-all duration-150'}
+            `}
+          >
+            <PreviewPane
+              currentText={content}
+              originalText={baselineContent}
+              onUndo={onUndo}
+              onRedo={onRedo}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              onExport={onExport}
+              focusedSuggestion={focusedSuggestion}
+              isCollapsed={isMobileScreen ? false : isDiffCollapsed}
+              onToggleCollapse={handleToggleDiffCollapse}
+              loreEntries={loreEntries}
+              onOpenFile={onOpenFile}
+              isCharacterOrWorld={isCharacterOrWorld}
+              documentCategory={documentCategory}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

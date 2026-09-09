@@ -4,7 +4,7 @@ import { ImportModal } from './ImportModal.tsx';
 import { ExportModal } from './ExportModal.tsx';
 import { NovelModal } from './NovelModal.tsx';
 import { CoverUploadModal } from './CoverUploadModal.tsx';
-import { Novel, CoverTheme } from '../../types/index.ts';
+import { Novel, CoverTheme, AuthorProfile } from '../../types/index.ts';
 import { NovelCrafterParseResult } from '../../engine/novelcrafter/index.ts';
 import { NovelCrafterImportOptions, NovelCrafterImportSummary } from '../../engine/novelcrafter/importer.ts';
 
@@ -17,6 +17,7 @@ interface ModalsProps {
   setIsNovelOpen: (v: boolean) => void;
   initialNovelModalTab?: 'list' | 'create' | 'edit' | 'import' | 'prompts';
   initialNovelModalNovelId?: string;
+  authorProfile?: AuthorProfile;
   isCoverUploadOpen?: boolean;
   setIsCoverUploadOpen?: (v: boolean) => void;
   coverUploadNovel?: Novel | null;
@@ -66,6 +67,7 @@ export const ModalsContainer: React.FC<ModalsProps> = ({
   setIsNovelOpen,
   initialNovelModalTab,
   initialNovelModalNovelId,
+  authorProfile,
   isCoverUploadOpen = false,
   setIsCoverUploadOpen,
   coverUploadNovel = null,
@@ -140,6 +142,7 @@ export const ModalsContainer: React.FC<ModalsProps> = ({
         compiledMarkdown={compiledPreview}
         novelTitle={novelTitle}
         genre={activeNovel?.genre}
+        authorProfile={authorProfile}
         sceneFiles={sceneFiles}
         bibleFiles={bibleFiles}
         activeFilePath={activeFilePath}
@@ -151,6 +154,7 @@ export const ModalsContainer: React.FC<ModalsProps> = ({
         onClose={() => setIsNovelOpen(false)}
         novels={novels}
         activeNovelId={activeNovelId}
+        authorProfile={authorProfile}
         initialTab={initialNovelModalTab}
         initialNovelId={initialNovelModalNovelId}
         onSelectNovel={async (id) => {

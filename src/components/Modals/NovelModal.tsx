@@ -20,7 +20,7 @@ import {
   Sliders,
   Info,
 } from 'lucide-react';
-import { Novel, NovelCustomPrompts, CoverTheme } from '../../types/index.ts';
+import { Novel, NovelCustomPrompts, CoverTheme, AuthorProfile } from '../../types/index.ts';
 import { NovelCrafterParseResult } from '../../engine/novelcrafter/index.ts';
 import { NovelCrafterImportOptions, NovelCrafterImportSummary } from '../../engine/novelcrafter/importer.ts';
 import { NovelCrafterImportView } from './NovelCrafterImportView.tsx';
@@ -33,6 +33,7 @@ interface NovelModalProps {
   onClose: () => void;
   novels: Novel[];
   activeNovelId: string;
+  authorProfile?: AuthorProfile;
   initialTab?: 'list' | 'create' | 'edit' | 'import' | 'prompts';
   initialNovelId?: string;
   onSelectNovel: (id: string) => Promise<void>;
@@ -78,6 +79,7 @@ export const NovelModal: React.FC<NovelModalProps> = ({
   onClose,
   novels,
   activeNovelId,
+  authorProfile,
   onSelectNovel,
   onCreateNovel,
   onUpdateNovel,
@@ -94,6 +96,8 @@ export const NovelModal: React.FC<NovelModalProps> = ({
   const [editingNovelId, setEditingNovelId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const authorDisplayName = authorProfile?.penName || authorProfile?.name;
 
   const activeNovel: Novel = novels.find(n => n.id === activeNovelId) || novels[0] || ({} as Novel);
 
@@ -436,6 +440,11 @@ export const NovelModal: React.FC<NovelModalProps> = ({
                             {novel.genre && (
                               <span className="text-[10px] bg-stone-800 text-amber-300/90 px-2 py-0.5 rounded border border-stone-700 font-medium">
                                 {novel.genre}
+                              </span>
+                            )}
+                            {authorDisplayName && (
+                              <span className="text-[10px] text-stone-400 font-normal">
+                                by {authorDisplayName}
                               </span>
                             )}
                             {isActive && (

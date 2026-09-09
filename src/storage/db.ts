@@ -1,4 +1,4 @@
-import { UserRule, IgnoredTerm, RecentDocument, Novel, LLMSettings } from '../types/index.ts';
+import { UserRule, IgnoredTerm, RecentDocument, Novel, LLMSettings, AuthorProfile } from '../types/index.ts';
 import { DEFAULT_USER_RULES } from '../engine/checks/index.ts';
 
 // Web LocalStorage / In-memory DB interface that mirrors SQLite schema
@@ -10,6 +10,20 @@ const RECENTS_KEY = 'storyspark_recent_docs';
 const LLM_SETTINGS_KEY = 'storyspark_llm_settings';
 const NOVELS_KEY = 'storyspark_novels';
 const ACTIVE_NOVEL_KEY = 'storyspark_active_novel_id';
+export const DIFF_PANE_ENABLED_KEY = 'storyspark_diff_pane_enabled';
+export const AUTHOR_PROFILE_KEY = 'storyspark_author_profile';
+
+export const DEFAULT_AUTHOR_PROFILE: AuthorProfile = {
+  name: 'E. A. Sterling',
+  penName: '',
+  bio: 'Author of speculative fiction and dark fantasy exploring forgotten archives, ancient cartography, and quiet resistance.',
+  email: 'author@storyspark.studio',
+  website: 'https://storyspark.studio',
+  socialHandle: '@easterling_author',
+  location: 'Pacific Northwest',
+  copyrightNotice: `© ${new Date().getFullYear()} E. A. Sterling. All rights reserved.`,
+  updatedAt: 1700000000000,
+};
 
 export const DEFAULT_NOVELS: Novel[] = [
   {
@@ -266,6 +280,71 @@ export class LocalDatabase {
       localStorage.setItem(ACTIVE_NOVEL_KEY, id);
     }
     await this.saveSetting(ACTIVE_NOVEL_KEY, { activeId: id });
+  }
+
+  async getDiffPaneEnabled(): Promise<boolean> {
+    const remote = await this.fetchSetting<{ enabled: boolean } | boolean>(DIFF_PANE_ENABLED_KEY);
+    if (typeof remote === 'boolean') {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(DIFF_PANE_ENABLED_KEY, String(remote));
+      }
+      return remote;
+    }
+    if (remote && typeof (remote as any).enabled === 'boolean') {
+      const val = (remote as any).enabled;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(DIFF_PANE_ENABLED_KEY, String(val));
+      }
+      return val;
+    }
+
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem(DIFF_PANE_ENABLED_KEY);
+      if (raw !== null) {
+        return raw === 'true';
+      }
+    }
+    return true; // Default enabled
+  }
+
+  async saveDiffPaneEnabled(enabled: boolean): Promise<void> {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(DIFF_PANE_ENABLED_KEY, String(enabled));
+    }
+    await this.saveSetting(DIFF_PANE_ENABLED_KEY, { enabled });
+  }
+
+  async getAuthorProfile(): Promise<AuthorProfile> {
+    const remote = await this.fetchSetting<AuthorProfile>(AUTHOR_PROFILE_KEY);
+    if (remote && remote.name) {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(AUTHOR_PROFILE_KEY, JSON.stringify(remote));
+      }
+      return { ...DEFAULT_AUTHOR_PROFILE, ...remote };
+    }
+
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(AUTHOR_PROFILE_KEY) : null;
+    if (!raw) return DEFAULT_AUTHOR_PROFILE;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        return { ...DEFAULT_AUTHOR_PROFILE, ...parsed };
+      }
+      return DEFAULT_AUTHOR_PROFILE;
+    } catch {
+      return DEFAULT_AUTHOR_PROFILE;
+    }
+  }
+
+  async saveAuthorProfile(profile: AuthorProfile): Promise<void> {
+    const updated = {
+      ...profile,
+      updatedAt: Date.now(),
+    };
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(AUTHOR_PROFILE_KEY, JSON.stringify(updated));
+    }
+    await this.saveSetting(AUTHOR_PROFILE_KEY, updated);
   }
 }
 

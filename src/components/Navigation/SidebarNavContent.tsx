@@ -18,13 +18,14 @@ import {
   Check,
 } from 'lucide-react';
 import { FileItem } from '../../storage/fs.ts';
-import { Novel, SceneSummary, CoverTheme } from '../../types/index.ts';
+import { Novel, SceneSummary, CoverTheme, AuthorProfile } from '../../types/index.ts';
 import { PWAInstallButton } from '../Common/PWAInstallButton.tsx';
 
 export interface SidebarNavContentProps {
   isMobile?: boolean;
   activeNovel?: Novel;
   novels: Novel[];
+  authorProfile?: AuthorProfile;
   currentTheme?: CoverTheme | null;
   isThemeActive?: boolean;
   isDropdownOpen: boolean;
@@ -57,6 +58,7 @@ export const SidebarNavContent: React.FC<SidebarNavContentProps> = ({
   isMobile = false,
   activeNovel,
   novels,
+  authorProfile,
   currentTheme,
   isThemeActive = false,
   isDropdownOpen,
@@ -86,6 +88,8 @@ export const SidebarNavContent: React.FC<SidebarNavContentProps> = ({
 }) => {
   const characters = bibleFiles.filter((f) => f.path.includes('characters'));
   const world = bibleFiles.filter((f) => f.path.includes('world'));
+
+  const authorDisplayName = authorProfile?.penName || authorProfile?.name;
 
   const currentTotalWords = Object.values(summaries).reduce(
     (acc, s) => acc + (s.wordCount || 0),
@@ -201,11 +205,15 @@ export const SidebarNavContent: React.FC<SidebarNavContentProps> = ({
                     </span>
                   )}
                 </div>
-                {activeNovel.genre && (
-                  <div className="text-[9px] text-amber-400/80 truncate mt-0.5 font-medium">
-                    {activeNovel.genre}
-                  </div>
-                )}
+                <div className="flex items-center gap-1 text-[9px] text-amber-400/80 truncate mt-0.5 font-medium">
+                  {activeNovel.genre && <span>{activeNovel.genre}</span>}
+                  {authorDisplayName && (
+                    <>
+                      {activeNovel.genre && <span className="text-stone-600 font-mono">·</span>}
+                      <span className="text-stone-400 font-normal">by {authorDisplayName}</span>
+                    </>
+                  )}
+                </div>
               </div>
               <ChevronDown
                 className={`w-3.5 h-3.5 text-stone-400 flex-shrink-0 transition-transform ${
@@ -236,11 +244,11 @@ export const SidebarNavContent: React.FC<SidebarNavContentProps> = ({
                   className="bg-amber-600 h-full rounded-full transition-all duration-300"
                   style={{
                     width: `${Math.min(
-                      100,
-                      Math.round(
-                        (currentTotalWords / activeNovel.targetWordCount) * 100
-                      )
-                    )}%`,
+                    100,
+                    Math.round(
+                      (currentTotalWords / activeNovel.targetWordCount) * 100
+                    )
+                  )}%`,
                   }}
                 />
               </div>
@@ -274,10 +282,16 @@ export const SidebarNavContent: React.FC<SidebarNavContentProps> = ({
                       }`}
                     >
                       <div className="truncate flex-1 min-w-0">
-                        <div className="truncate">{novel.title}</div>
-                        {novel.genre && (
-                          <div className="text-[9px] text-stone-500 truncate">{novel.genre}</div>
-                        )}
+                        <div className="truncate font-medium">{novel.title}</div>
+                        <div className="text-[9px] text-stone-500 truncate flex items-center gap-1 mt-0.5">
+                          {novel.genre && <span>{novel.genre}</span>}
+                          {authorDisplayName && (
+                            <>
+                              {novel.genre && <span className="text-stone-600 font-mono">·</span>}
+                              <span className="text-stone-400">by {authorDisplayName}</span>
+                            </>
+                          )}
+                        </div>
                       </div>
                       {isSelected && <Check className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />}
                     </button>

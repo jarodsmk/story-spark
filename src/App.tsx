@@ -12,6 +12,7 @@ import { useManuscriptActions } from './hooks/useManuscriptActions.ts';
 import { useLoreManager } from './hooks/useLoreManager.ts';
 import { useSceneSummaries } from './hooks/useSceneSummaries.ts';
 import { useCoverTheme } from './hooks/useCoverTheme.ts';
+import { useThemeMode } from './hooks/useThemeMode.ts';
 import { getDocumentCategory, isCharacterOrWorldDocument } from './utils/documentType.ts';
 import { Loader2 } from 'lucide-react';
 
@@ -22,8 +23,10 @@ import { SettingsModal } from './components/Settings/SettingsModal.tsx';
 import { ModalsContainer } from './components/Modals/ModalsContainer.tsx';
 import { SceneSummaryModal } from './components/Modals/SceneSummaryModal.tsx';
 import { OfflineIndicator } from './components/Common/OfflineIndicator.tsx';
+import { FullScreenLoader } from './components/Common/FullScreenLoader.tsx';
 
 export function App() {
+  const themeModeState = useThemeMode();
   const novelsState = useNovels();
   const files = useProjectFiles(novelsState.activeNovelId);
   const settings = useProjectSettings();
@@ -38,6 +41,8 @@ export function App() {
 
   const [isLoadingCurrentScene, setIsLoadingCurrentScene] = useState<boolean>(true);
   const [isImporting, setIsImporting] = useState<boolean>(false);
+  const [hasInitialLoaded, setHasInitialLoaded] = useState<boolean>(false);
+  const [isLoaderFading, setIsLoaderFading] = useState<boolean>(false);
 
   const handleSaveTheme = useCallback(
     async (novelId: string, theme: any) => {
@@ -53,7 +58,11 @@ export function App() {
     [handleSaveTheme]
   );
 
-  const { currentTheme, isThemeActive } = useCoverTheme(novelsState.activeNovel, coverThemeOptions);
+  const { currentTheme, isThemeActive } = useCoverTheme(
+    novelsState.activeNovel,
+    coverThemeOptions,
+    themeModeState.isLightMode
+  );
 
   const [baseline, setBaseline] = useState('');
   const [saving, setSaving] = useState(false);
@@ -75,6 +84,26 @@ export function App() {
   const [openCoverModal, setOpenCoverModal] = useState(false);
   const [coverTargetNovel, setCoverTargetNovel] = useState<Novel | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
+
+  // 2-second flash animation state for changed or added text via AI
+  const [flashRange, setFlashRange] = useState<{ start: number; end: number; key: number } | null>(null);
+  const flashTimerRef = useRef<any>(null);
+
+  const triggerFlash = useCallback((start: number, end: number) => {
+    if (start >= end) return;
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    setFlashRange({ start, end, key: Date.now() });
+    flashTimerRef.current = setTimeout(() => {
+      setFlashRange(null);
+    }, 2000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    };
+  }, []);
+
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem('story_spark_sidebar_collapsed') === 'true';
@@ -223,6 +252,36 @@ export function App() {
     }
   }, [files.activeFilePath]);
 
+  // Check if expected novel and scene have fully loaded for the initial page load
+  const isInitialReady = Boolean(
+    !novelsState.isLoadingNovels &&
+    !files.isLoadingScenes &&
+    !isLoadingCurrentScene &&
+    loadedPathRef.current &&
+    loadedPathRef.current === files.activeFilePath
+  );
+
+  useEffect(() => {
+    if (!hasInitialLoaded && isInitialReady) {
+      setIsLoaderFading(true);
+      const timer = setTimeout(() => {
+        setHasInitialLoaded(true);
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [hasInitialLoaded, isInitialReady]);
+
+  // Fallback timer: ensure the user is never stuck if storage operations stall
+  useEffect(() => {
+    if (!hasInitialLoaded) {
+      const fallbackTimer = setTimeout(() => {
+        setIsLoaderFading(true);
+        setTimeout(() => setHasInitialLoaded(true), 350);
+      }, 6000);
+      return () => clearTimeout(fallbackTimer);
+    }
+  }, [hasInitialLoaded]);
+
   // Periodically refresh active novel word count
   useEffect(() => {
     let isMounted = true;
@@ -291,7 +350,9 @@ export function App() {
         settings.llmSettings,
         novelsState.activeNovel?.customPrompts?.rewrite
       );
-      handleChange(replacePassage(hist.state, selRange.start, selRange.end, res.rewrittenText));
+      const newText = replacePassage(hist.state, selRange.start, selRange.end, res.rewrittenText);
+      handleChange(newText);
+      triggerFlash(selRange.start, selRange.start + res.rewrittenText.length);
     } catch (err: any) {
       setAiErr(err.message || 'Drafting failed.');
     } finally {
@@ -346,8 +407,10 @@ export function App() {
   const handleAcceptAllAI = () => {
     const activeAI = aiSuggestions.filter(s => !dismissed.has(s.id));
     if (activeAI.length === 0) return;
+    const minStart = Math.min(...activeAI.map(s => s.startIndex));
     const newText = applyMultipleSuggestions(hist.state, activeAI);
     handleChange(newText);
+    triggerFlash(minStart, minStart + Math.max(1, newText.length - minStart));
     setDismissed(prev => {
       const next = new Set(prev);
       activeAI.forEach(s => next.add(s.id));
@@ -388,13 +451,27 @@ export function App() {
   return (
     <div
       id="storyspark-app-root"
-      className="flex h-screen w-screen overflow-hidden bg-stone-900 text-stone-100 select-none relative"
+      data-theme={themeModeState.themeMode}
+      className="flex h-screen w-screen overflow-hidden bg-stone-900 text-stone-100 select-none relative transition-colors duration-200"
       style={{
         backgroundImage: isThemeActive && currentTheme ? 'var(--app-glow)' : undefined,
       }}
     >
+      {/* Full Screen Initial Loader */}
+      {!hasInitialLoaded && (
+        <FullScreenLoader
+          activeNovelTitle={novelsState.activeNovel?.title}
+          activeSceneName={files.activeFileName}
+          isLoadingNovels={novelsState.isLoadingNovels}
+          isLoadingScenes={files.isLoadingScenes}
+          isLoadingCurrentScene={isLoadingCurrentScene}
+          isFadingOut={isLoaderFading}
+          isLightMode={themeModeState.isLightMode}
+        />
+      )}
+
       {/* Top Page Loading Bar */}
-      {(files.isLoadingScenes || isLoadingCurrentScene || isImporting) && (
+      {hasInitialLoaded && (files.isLoadingScenes || isLoadingCurrentScene || isImporting) && (
         <div
           id="global-page-loading-bar"
           className="fixed top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-amber-500 via-amber-300 to-amber-500 z-50 animate-pulse shadow-[0_0_10px_rgba(245,158,11,0.8)]"
@@ -402,7 +479,7 @@ export function App() {
       )}
 
       {/* Floating Status Pill for Page Loading */}
-      {(files.isLoadingScenes || isLoadingCurrentScene || isImporting) && (
+      {hasInitialLoaded && (files.isLoadingScenes || isLoadingCurrentScene || isImporting) && (
         <div
           id="global-page-loading-status"
           className="fixed top-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-3 py-1.5 rounded-full bg-stone-900/95 border border-amber-500/40 text-amber-200 text-xs font-medium shadow-2xl backdrop-blur-md pointer-events-none"
@@ -444,6 +521,7 @@ export function App() {
         onExportCompiled={ms.handleCompile}
         novels={novelsState.novels}
         activeNovel={novelsState.activeNovel}
+        authorProfile={settings.authorProfile}
         onSelectNovel={novelsState.selectNovel}
         onOpenNovelManager={handleOpenNovelManager}
         onOpenNovelPrompts={handleOpenNovelPrompts}
@@ -475,6 +553,7 @@ export function App() {
       )}
 
       <EditorContainer
+        key={`editor-container-${settings.diffPaneEnabled ? 'diff-enabled' : 'diff-disabled'}`}
         sidebarWidth={sidebarWidth}
         content={hist.state}
         onContentChange={handleChange}
@@ -487,6 +566,7 @@ export function App() {
           setDismissed(prev => new Set(prev).add(s.id));
           if (s.ruleCategory === 'ai' || s.type === 'ai-rewrite') {
             setAiSuggestions(prev => prev.filter(item => item.id !== s.id));
+            triggerFlash(s.startIndex, s.startIndex + s.replacementText.length);
           }
         }}
         onDismissSuggestion={(s) => {
@@ -538,6 +618,9 @@ export function App() {
         onToggleSidebarCollapse={handleToggleSidebarCollapse}
         onToggleMobileSidebar={() => setIsMobileSidebarOpen((prev) => !prev)}
         isLoadingCurrentScene={isLoadingCurrentScene}
+        diffPaneEnabled={settings.diffPaneEnabled}
+        flashRange={flashRange}
+        onTriggerFlash={triggerFlash}
       />
 
       <SettingsModal
@@ -550,6 +633,12 @@ export function App() {
         onRemoveIgnoredTerm={settings.removeIgnoredTerm}
         llmSettings={settings.llmSettings}
         onSaveLLMSettings={(s) => { settings.saveLLMSettings(s); setOpenSettings(false); }}
+        authorProfile={settings.authorProfile}
+        onSaveAuthorProfile={settings.saveAuthorProfile}
+        themeMode={themeModeState.themeMode}
+        onToggleThemeMode={themeModeState.toggleThemeMode}
+        diffPaneEnabled={settings.diffPaneEnabled}
+        onToggleDiffPane={settings.saveDiffPaneEnabled}
       />
 
       <ModalsContainer
@@ -561,6 +650,7 @@ export function App() {
         setIsNovelOpen={setOpenNovelManager}
         initialNovelModalTab={novelModalTab}
         initialNovelModalNovelId={novelModalNovelId}
+        authorProfile={settings.authorProfile}
         isCoverUploadOpen={openCoverModal}
         setIsCoverUploadOpen={setOpenCoverModal}
         coverUploadNovel={coverTargetNovel}

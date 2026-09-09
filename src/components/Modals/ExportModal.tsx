@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { fs, FileItem } from '../../storage/fs.ts';
 import { sanitizeFilename, compileNovelManuscript, compileNovelText } from '../../engine/markdown/index.ts';
-import { SceneDocument, BibleEntity } from '../../types/index.ts';
+import { SceneDocument, BibleEntity, AuthorProfile } from '../../types/index.ts';
 import { downloadNovelPDF } from '../../engine/export/pdfExport.ts';
 
 export interface ExportModalProps {
@@ -30,6 +30,7 @@ export interface ExportModalProps {
   novelTitle?: string;
   genre?: string;
   author?: string;
+  authorProfile?: AuthorProfile;
   sceneFiles?: FileItem[];
   bibleFiles?: FileItem[];
   activeFilePath?: string;
@@ -62,6 +63,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   novelTitle = 'Novel',
   genre,
   author,
+  authorProfile,
   sceneFiles = [],
   bibleFiles = [],
   activeFilePath,
@@ -77,10 +79,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
   // Compilation customization options
   const [includeAppendix, setIncludeAppendix] = useState(false);
+  const [includeAuthorInfo, setIncludeAuthorInfo] = useState(true);
   const [headingStyle, setHeadingStyle] = useState<'numbered' | 'simple' | 'original'>('numbered');
   const [sceneSeparator, setSceneSeparator] = useState<'divider' | 'asterisms' | 'blank'>('divider');
   const [pdfFont, setPdfFont] = useState<'times' | 'helvetica'>('times');
   const [showOptions, setShowOptions] = useState(false);
+
+  const effectiveAuthor = authorProfile?.penName || authorProfile?.name || author;
 
   // Load all scenes and bible files when modal opens
   useEffect(() => {
@@ -204,8 +209,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       chapterHeadingStyle: headingStyle,
       sceneSeparator: sceneSeparator,
       novelTitle,
+      author: effectiveAuthor,
+      authorProfile,
+      includeAuthorInfo,
     });
-  }, [scenes.length, initialCompiledMarkdown, sceneDocs, bibleDocs, includeAppendix, headingStyle, sceneSeparator, novelTitle]);
+  }, [scenes.length, initialCompiledMarkdown, sceneDocs, bibleDocs, includeAppendix, headingStyle, sceneSeparator, novelTitle, effectiveAuthor, authorProfile, includeAuthorInfo]);
 
   // Dynamic compiled plain text representation
   const compiledText = useMemo(() => {
@@ -214,8 +222,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       chapterHeadingStyle: headingStyle,
       sceneSeparator: sceneSeparator,
       novelTitle,
+      author: effectiveAuthor,
+      authorProfile,
+      includeAuthorInfo,
     });
-  }, [sceneDocs, bibleDocs, includeAppendix, headingStyle, sceneSeparator, novelTitle]);
+  }, [sceneDocs, bibleDocs, includeAppendix, headingStyle, sceneSeparator, novelTitle, effectiveAuthor, authorProfile, includeAuthorInfo]);
 
   // Manuscript aggregate metrics
   const totalSelectedWords = useMemo(() => {
@@ -328,7 +339,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       downloadNovelPDF({
         title: novelTitle,
         genre,
-        author,
+        author: effectiveAuthor,
+        authorProfile,
+        includeAuthorInfo,
         scenes: selectedScenes.map((s, idx) => ({
           id: s.id,
           title: s.title,
@@ -569,6 +582,21 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
               {showOptions && (
                 <div className="pt-2 space-y-2.5 border-t border-stone-800/80 text-[11px]">
+                  {/* Author Profile Toggle */}
+                  <label
+                    id="compile-author-toggle-label"
+                    className="flex items-center justify-between cursor-pointer group"
+                  >
+                    <span className="text-stone-300">Include Author Profile & Bio</span>
+                    <input
+                      id="compile-include-author-checkbox"
+                      type="checkbox"
+                      checked={includeAuthorInfo}
+                      onChange={(e) => setIncludeAuthorInfo(e.target.checked)}
+                      className="accent-amber-500 rounded cursor-pointer"
+                    />
+                  </label>
+
                   {/* Appendix Toggle */}
                   <label
                     id="compile-appendix-toggle-label"
@@ -742,7 +770,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                       {novelTitle}
                     </h1>
                     {genre && <p className="text-xs text-amber-500 italic mt-1 font-sans">{genre}</p>}
-                    {author && <p className="text-xs text-stone-400 mt-1 font-sans">By {author}</p>}
+                    {effectiveAuthor && <p className="text-xs text-stone-400 mt-1 font-sans">By {effectiveAuthor}</p>}
+                    {authorProfile?.copyrightNotice && (
+                      <p className="text-[10px] text-stone-500 mt-1 font-mono italic">{authorProfile.copyrightNotice}</p>
+                    )}
                   </div>
 
                   {selectedScenes.map((scene, idx) => {
@@ -792,6 +823,45 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                           </div>
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {includeAuthorInfo && (authorProfile?.bio || effectiveAuthor) && (
+                    <div className="pt-8 border-t border-stone-800 space-y-3">
+                      <h2 className="text-xl font-bold text-amber-400 font-sans">About the Author</h2>
+                      <div className="bg-stone-900/70 p-4 rounded-xl border border-stone-800 space-y-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-amber-600/20 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-sm font-sans">
+                            {(effectiveAuthor || 'A').charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-stone-100 font-sans text-sm">
+                              {effectiveAuthor}
+                            </h3>
+                            {authorProfile?.location && (
+                              <p className="text-[11px] text-stone-400 font-sans">{authorProfile.location}</p>
+                            )}
+                          </div>
+                        </div>
+                        {authorProfile?.bio && (
+                          <p className="text-[13px] text-stone-300 font-serif leading-relaxed whitespace-pre-wrap">
+                            {authorProfile.bio}
+                          </p>
+                        )}
+                        {(authorProfile?.website || authorProfile?.email || authorProfile?.socialHandle) && (
+                          <div className="flex flex-wrap gap-4 pt-2 border-t border-stone-800/80 text-[11px] text-stone-400 font-sans">
+                            {authorProfile.website && (
+                              <span>Website: {authorProfile.website}</span>
+                            )}
+                            {authorProfile.email && (
+                              <span>Contact: {authorProfile.email}</span>
+                            )}
+                            {authorProfile.socialHandle && (
+                              <span>Social: {authorProfile.socialHandle}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

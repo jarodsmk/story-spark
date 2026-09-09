@@ -13,7 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { FileItem } from '../../storage/fs.ts';
-import { Novel, SceneSummary, CoverTheme } from '../../types/index.ts';
+import { Novel, SceneSummary, CoverTheme, AuthorProfile } from '../../types/index.ts';
 import { AppLogo } from '../Common/AppLogo.tsx';
 import { SidebarNavContent } from './SidebarNavContent.tsx';
 import { PWAInstallButton } from '../Common/PWAInstallButton.tsx';
@@ -38,6 +38,7 @@ interface SidebarProps {
   onToggleCollapse?: () => void;
   activeNovel?: Novel;
   novels?: Novel[];
+  authorProfile?: AuthorProfile;
   onSelectNovel?: (id: string) => void;
   onOpenNovelManager?: () => void;
   onUploadCover?: (novel: Novel) => void;
@@ -70,6 +71,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   activeNovel,
   novels = [],
+  authorProfile,
   onSelectNovel,
   onOpenNovelManager,
   onUploadCover,
@@ -139,6 +141,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           isMobile={true}
           activeNovel={activeNovel}
           novels={novels}
+          authorProfile={authorProfile}
           currentTheme={currentTheme}
           isThemeActive={isThemeActive}
           isDropdownOpen={isDropdownOpen}
@@ -382,6 +385,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           isMobile={false}
           activeNovel={activeNovel}
           novels={novels}
+          authorProfile={authorProfile}
           currentTheme={currentTheme}
           isThemeActive={isThemeActive}
           isDropdownOpen={isDropdownOpen}

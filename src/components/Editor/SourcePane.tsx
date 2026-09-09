@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useMemo } from 'react';
+import React, { useRef, useEffect, useLayoutEffect, useState, useMemo, useCallback } from 'react';
 import {
   FileText,
   Clock,
@@ -49,6 +49,7 @@ interface SourcePaneProps {
   onDismissSuggestion?: (suggestion: Suggestion) => void;
   isDiffCollapsed?: boolean;
   onToggleDiffCollapse?: () => void;
+  diffPaneEnabled?: boolean;
   isSuggestionsCollapsed?: boolean;
   onToggleSuggestionsCollapse?: () => void;
   suggestionsCount?: number;
@@ -76,6 +77,10 @@ interface SourcePaneProps {
   isCharacterOrWorld?: boolean;
   documentCategory?: DocumentCategory;
   isLoadingCurrentScene?: boolean;
+  flashRange?: { start: number; end: number; key: number } | null;
+  onTriggerFlash?: (start: number, end: number) => void;
+  onAIRewrite?: (instruction: string) => void;
+  isGeneratingAI?: boolean;
 }
 
 export const SourcePane: React.FC<SourcePaneProps> = ({
@@ -91,6 +96,7 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
   onDismissSuggestion,
   isDiffCollapsed,
   onToggleDiffCollapse,
+  diffPaneEnabled = true,
   isSuggestionsCollapsed,
   onToggleSuggestionsCollapse,
   suggestionsCount,
@@ -114,10 +120,72 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
   isCharacterOrWorld = false,
   documentCategory = 'scene',
   isLoadingCurrentScene = false,
+  flashRange,
+  onTriggerFlash,
+  onAIRewrite,
+  isGeneratingAI = false,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const isHoveringTooltipRef = useRef<boolean>(false);
+
+  // Local flash range state for 2-second subtle animation when text is changed/added
+  const [localFlashRange, setLocalFlashRange] = useState<{
+    start: number;
+    end: number;
+    key: number;
+  } | null>(null);
+  const flashTimerRef = useRef<any>(null);
+
+  const triggerFlash = useCallback((start: number, end: number) => {
+    if (start >= end) return;
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    const newFlash = { start, end, key: Date.now() };
+    setLocalFlashRange(newFlash);
+    onTriggerFlash?.(start, end);
+    flashTimerRef.current = setTimeout(() => {
+      setLocalFlashRange(null);
+    }, 2000);
+  }, [onTriggerFlash]);
+
+  useEffect(() => {
+    return () => {
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    };
+  }, []);
+
+  // Clear flash state if active file/scene changes
+  useEffect(() => {
+    setLocalFlashRange(null);
+  }, [title]);
+
+  const activeFlash = flashRange || localFlashRange;
+
+  const safeFlash = useMemo(() => {
+    if (!activeFlash) return null;
+    const start = Math.max(0, Math.min(content.length, activeFlash.start));
+    const end = Math.max(0, Math.min(content.length, activeFlash.end));
+    if (start >= end) return null;
+    return { start, end, key: activeFlash.key };
+  }, [activeFlash, content.length]);
+
+  const scrollToTextRange = useCallback((start: number, _end: number) => {
+    if (!textareaRef.current) return;
+    const textarea = textareaRef.current;
+    const textBefore = content.substring(0, start);
+    const lines = textBefore.split('\n').length;
+    const targetTop = lines * 26;
+    const containerHeight = textarea.clientHeight || 400;
+    const currentScroll = textarea.scrollTop;
+
+    if (targetTop < currentScroll || targetTop > currentScroll + containerHeight - 60) {
+      const targetScrollTop = Math.max(0, targetTop - containerHeight / 3);
+      textarea.scrollTo({
+        top: targetScrollTop,
+        behavior: 'smooth',
+      });
+    }
+  }, [content]);
 
   // Toggle highlight visibility (defaults to true)
   const [showHighlights, setShowHighlights] = useState<boolean>(true);
@@ -209,21 +277,34 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
   ) => {
     if (mode === 'append') {
       const trimmed = content.trimEnd();
+      const appendStart = trimmed ? trimmed.length + 2 : 0;
       const newContent = trimmed ? `${trimmed}\n\n${generatedText}` : generatedText;
+      const appendEnd = appendStart + generatedText.length;
       onChange(newContent);
+      triggerFlash(appendStart, appendEnd);
+
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          textareaRef.current.setSelectionRange(appendEnd, appendEnd);
+          scrollToTextRange(appendStart, appendEnd);
+        }
+      }, 50);
     } else {
       const start = generateModal.startIndex;
       const end = generateModal.endIndex;
       const before = content.slice(0, start);
       const after = content.slice(end);
       const newContent = before + generatedText + after;
+      const insertEnd = start + generatedText.length;
       onChange(newContent);
+      triggerFlash(start, insertEnd);
 
       setTimeout(() => {
         if (textareaRef.current) {
-          const newPos = start + generatedText.length;
           textareaRef.current.focus();
-          textareaRef.current.setSelectionRange(newPos, newPos);
+          textareaRef.current.setSelectionRange(insertEnd, insertEnd);
+          scrollToTextRange(start, insertEnd);
         }
       }, 50);
     }
@@ -236,6 +317,14 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
       backdropRef.current.scrollLeft = textareaRef.current.scrollLeft;
     }
   };
+
+  // Ensure lockstep scroll synchronization on every layout pass
+  useLayoutEffect(() => {
+    if (textareaRef.current && backdropRef.current) {
+      backdropRef.current.scrollTop = textareaRef.current.scrollTop;
+      backdropRef.current.scrollLeft = textareaRef.current.scrollLeft;
+    }
+  });
 
   // Direct unlink helper for quick actions
   const handleUnlinkLoreDirect = (start?: number, end?: number) => {
@@ -529,67 +618,120 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
 
   // Render backdrop segments with subtle highlights for raw editor view
   const backdropElements = useMemo(() => {
-    if (!showHighlights || (sceneReferences.length === 0 && !focusedSuggestion)) return null;
+    const hasHighlights = showHighlights && sceneReferences.length > 0;
+    const hasSelection = Boolean(selectedRange && selectedRange.start < selectedRange.end);
+    if (!hasHighlights && !focusedSuggestion && !safeFlash && !hasSelection) return null;
 
+    // Collect all boundary points to split content into non-overlapping segments
+    const pointsSet = new Set<number>([0, content.length]);
+
+    if (safeFlash) {
+      pointsSet.add(Math.max(0, Math.min(content.length, safeFlash.start)));
+      pointsSet.add(Math.max(0, Math.min(content.length, safeFlash.end)));
+    }
+
+    if (focusedSuggestion) {
+      pointsSet.add(Math.max(0, Math.min(content.length, focusedSuggestion.startIndex)));
+      pointsSet.add(Math.max(0, Math.min(content.length, focusedSuggestion.endIndex)));
+    }
+
+    if (hasSelection && selectedRange) {
+      pointsSet.add(Math.max(0, Math.min(content.length, selectedRange.start)));
+      pointsSet.add(Math.max(0, Math.min(content.length, selectedRange.end)));
+    }
+
+    if (hasHighlights) {
+      for (const ref of sceneReferences) {
+        pointsSet.add(Math.max(0, Math.min(content.length, ref.startIndex)));
+        pointsSet.add(Math.max(0, Math.min(content.length, ref.endIndex)));
+      }
+    }
+
+    const sortedPoints = Array.from(pointsSet).sort((a, b) => a - b);
     const nodes: React.ReactNode[] = [];
-    let lastIdx = 0;
 
-    for (let i = 0; i < sceneReferences.length; i++) {
-      const ref = sceneReferences[i];
-      if (ref.startIndex > lastIdx) {
+    for (let i = 0; i < sortedPoints.length - 1; i++) {
+      const start = sortedPoints[i];
+      const end = sortedPoints[i + 1];
+      if (start >= end) continue;
+
+      const segText = content.substring(start, end);
+      const isFlash = safeFlash ? start >= safeFlash.start && end <= safeFlash.end : false;
+      const isFocused = focusedSuggestion ? start >= focusedSuggestion.startIndex && end <= focusedSuggestion.endIndex : false;
+      const isSelected = selectedRange ? start >= selectedRange.start && end <= selectedRange.end : false;
+      const matchingRef = hasHighlights ? sceneReferences.find(r => start >= r.startIndex && end <= r.endIndex) : undefined;
+      const isCursorActive = matchingRef && activeCursorRef && activeCursorRef.startIndex === matchingRef.startIndex;
+
+      if (!isFlash && !isFocused && !matchingRef && !isSelected) {
         nodes.push(
-          <span key={`b-text-${lastIdx}`} className="opacity-0 select-none">
-            {content.substring(lastIdx, ref.startIndex)}
+          <span key={`b-plain-${start}-${end}`} className="storyspark-plain-text opacity-0 select-none">
+            {segText}
           </span>
         );
+        continue;
       }
 
-      const isChar = ref.entry ? ref.entry.category === 'character' : ref.targetPath.includes('characters');
-      const isIdea = ref.entry ? ref.entry.category === 'idea' : (ref.targetPath.includes('scratchpad') || ref.targetPath.includes('ideas'));
-      const isFocused = focusedSuggestion && focusedSuggestion.startIndex <= ref.endIndex && focusedSuggestion.endIndex >= ref.startIndex;
-      const isCursorActive = activeCursorRef && activeCursorRef.startIndex === ref.startIndex;
+      // Build classes for highlighted segment - positioned directly behind the text with background fill
+      let classes = 'storyspark-highlight select-none text-transparent rounded-xs ';
+      if (isFlash) {
+        classes += 'ai-changed-flash ';
+      }
+
+      if (matchingRef) {
+        const isChar = matchingRef.entry ? matchingRef.entry.category === 'character' : matchingRef.targetPath.includes('characters');
+        const isIdea = matchingRef.entry ? matchingRef.entry.category === 'idea' : (matchingRef.targetPath.includes('scratchpad') || matchingRef.targetPath.includes('ideas'));
+        classes += 'transition-colors ';
+        if (isFocused) {
+          classes += 'bg-amber-400/40 animate-pulse ring-1 ring-amber-400/60 ';
+        } else if (isCursorActive) {
+          classes += isChar
+            ? 'bg-amber-500/40 ring-1 ring-amber-400/60 '
+            : 'bg-cyan-500/40 ring-1 ring-cyan-400/60 ';
+        } else {
+          classes += isChar
+            ? 'bg-amber-500/25 hover:bg-amber-500/35 '
+            : isIdea
+            ? 'bg-purple-500/25 hover:bg-purple-500/35 '
+            : 'bg-cyan-500/25 hover:bg-cyan-500/35 ';
+        }
+      } else if (isFocused) {
+        classes += 'bg-amber-400/40 animate-pulse ring-1 ring-amber-400/60 ';
+      } else if (isFlash) {
+        // Flash animation styles in index.css handle the glowing background directly behind the text
+      } else if (isSelected) {
+        classes += 'bg-amber-500/30 ring-1 ring-amber-400/40 ';
+      }
 
       nodes.push(
         <span
-          key={`b-ref-${ref.startIndex}-${ref.endIndex}`}
-          id={`lore-highlight-${ref.startIndex}`}
-          data-start={ref.startIndex}
-          data-end={ref.endIndex}
-          className={`rounded-xs border-b-2 transition-colors select-none font-medium ${
-            isFocused
-              ? 'bg-amber-400/40 border-amber-300 text-transparent animate-pulse ring-2 ring-amber-400/50'
-              : isCursorActive
-              ? isChar
-                ? 'bg-amber-500/40 border-amber-300 text-transparent ring-1 ring-amber-400/60'
-                : 'bg-cyan-500/40 border-cyan-300 text-transparent ring-1 ring-cyan-400/60'
-              : isChar
-              ? 'bg-amber-500/25 border-amber-400 text-transparent hover:bg-amber-500/35'
-              : isIdea
-              ? 'bg-purple-500/25 border-purple-400 text-transparent hover:bg-purple-500/35'
-              : 'bg-cyan-500/25 border-cyan-400 text-transparent hover:bg-cyan-500/35'
-          }`}
+          key={`b-seg-${start}-${end}${isFlash ? `-${safeFlash?.key}` : ''}`}
+          id={isFlash ? 'ai-flash-changed-text' : (matchingRef ? `lore-highlight-${matchingRef.startIndex}` : undefined)}
+          data-start={start}
+          data-end={end}
+          data-testid={isFlash ? 'ai-changed-flash' : undefined}
+          className={classes.trim()}
         >
-          {ref.raw}
+          {segText}
         </span>
       );
-
-      lastIdx = ref.endIndex;
     }
 
-    if (lastIdx < content.length) {
+    if (content.endsWith('\n')) {
       nodes.push(
-        <span key={`b-tail`} className="opacity-0 select-none">
-          {content.substring(lastIdx)}
+        <span key="b-trailing-newline" className="storyspark-plain-text opacity-0 select-none" aria-hidden="true">
+          {' '}
         </span>
       );
     }
 
     return nodes;
-  }, [content, sceneReferences, focusedSuggestion, showHighlights, activeCursorRef]);
+  }, [content, sceneReferences, focusedSuggestion, showHighlights, activeCursorRef, safeFlash, selectedRange]);
 
   return (
     <div
-      className="flex flex-col h-full bg-stone-900 border-r border-stone-800 relative"
+      className={`flex flex-col h-full w-full flex-1 min-w-0 bg-stone-900 ${
+        diffPaneEnabled ? 'border-r border-stone-800' : ''
+      } relative`}
       onContextMenu={handleContextMenu}
     >
       {/* Pane Header */}
@@ -711,7 +853,7 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
           <div className="text-xs text-stone-400 bg-stone-800/80 px-2 py-0.5 rounded font-mono">
             {wordCount} words
           </div>
-          {isDiffCollapsed && onToggleDiffCollapse && (
+          {diffPaneEnabled && isDiffCollapsed && onToggleDiffCollapse && (
             <button
               type="button"
               onClick={onToggleDiffCollapse}
@@ -890,6 +1032,18 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
                 <span>AI Draft</span>
               </button>
             )}
+            {!isCharacterOrWorld && onAIRewrite && (
+              <button
+                type="button"
+                onClick={() => onAIRewrite('Polish and tighten prose while maintaining voice')}
+                disabled={isGeneratingAI}
+                className="px-2 py-1 bg-amber-950/60 hover:bg-amber-900/70 text-amber-200 rounded text-[11px] flex items-center gap-1 transition border border-amber-800/50 disabled:opacity-50"
+                title="Rewrite selection with AI"
+              >
+                <Sparkles className="w-3 h-3 text-amber-400" />
+                <span>{isGeneratingAI ? 'Rewriting...' : 'AI Rewrite'}</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setSelectedRange(null)}
@@ -992,7 +1146,7 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
           <div
             ref={backdropRef}
             aria-hidden="true"
-            className="absolute inset-0 pointer-events-none overflow-hidden font-serif text-base leading-relaxed tracking-wide select-none whitespace-pre-wrap break-words"
+            className="storyspark-editor-surface storyspark-backdrop absolute inset-0 w-full h-full pointer-events-none select-none block z-0 border-0 m-0 p-0 box-border text-transparent"
           >
             {backdropElements}
           </div>
@@ -1004,14 +1158,27 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
             onChange={(e) => onChange(e.target.value)}
             onSelect={handleSelect}
             onKeyUp={handleSelect}
+            onKeyDown={handleScroll}
             onClick={handleTextareaClick}
             onMouseMove={handleTextareaMouseMove}
             onMouseLeave={handleTextareaMouseLeave}
             onScroll={handleScroll}
             placeholder="Start writing your scene in Markdown... Select any text and right-click to reference characters or lore."
             spellCheck={false}
-            className="w-full h-full bg-transparent resize-none border-none outline-none font-serif text-stone-200 text-base leading-relaxed tracking-wide placeholder-stone-600 focus:ring-0 overflow-y-auto relative z-10"
+            className="storyspark-editor-surface storyspark-editor-textarea absolute inset-0 w-full h-full bg-transparent resize-none border-none outline-none text-stone-200 placeholder-stone-600 focus:ring-0 z-10 block m-0 p-0 box-border"
           />
+
+          {/* Subtle floating badge when AI changes or adds text */}
+          {safeFlash && (
+            <div
+              id="ai-text-changed-badge"
+              data-testid="ai-text-changed-badge"
+              className="absolute bottom-3 right-5 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-950/90 border border-amber-500/50 text-amber-200 text-xs font-medium shadow-lg backdrop-blur-md pointer-events-none animate-in fade-in duration-150"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+              <span>AI text updated</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1067,6 +1234,7 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
         onSelectReference={handleSelectReference}
         onOpenNewModal={handleOpenNewModal}
         onOpenGenerateContent={isCharacterOrWorld ? undefined : handleOpenGenerateContent}
+        onAIRewrite={isCharacterOrWorld ? undefined : onAIRewrite}
         onUnlinkReference={handleUnlink}
         onOpenBibleFile={(path) => {
           if (onOpenFile) onOpenFile(path);
