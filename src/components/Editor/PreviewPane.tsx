@@ -218,7 +218,7 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
 
           {/* Collapse Button */}
           {onToggleCollapse && (
-            <>
+            <div className="hidden md:flex items-center">
               <div className="h-4 w-px bg-stone-800 mx-1" />
               <button
                 type="button"
@@ -228,7 +228,7 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
               >
                 <PanelRightClose className="w-4 h-4" />
               </button>
-            </>
+            </div>
           )}
         </div>
       </div>

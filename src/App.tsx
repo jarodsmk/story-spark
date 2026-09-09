@@ -17,9 +17,11 @@ import { Loader2 } from 'lucide-react';
 
 import { Sidebar } from './components/Navigation/Sidebar.tsx';
 import { EditorContainer } from './components/Editor/EditorContainer.tsx';
+import { PanelResizer } from './components/Common/PanelResizer.tsx';
 import { SettingsModal } from './components/Settings/SettingsModal.tsx';
 import { ModalsContainer } from './components/Modals/ModalsContainer.tsx';
 import { SceneSummaryModal } from './components/Modals/SceneSummaryModal.tsx';
+import { OfflineIndicator } from './components/Common/OfflineIndicator.tsx';
 
 export function App() {
   const novelsState = useNovels();
@@ -72,6 +74,7 @@ export function App() {
   const [activeWordCount, setActiveWordCount] = useState<number>(0);
   const [openCoverModal, setOpenCoverModal] = useState(false);
   const [coverTargetNovel, setCoverTargetNovel] = useState<Novel | null>(null);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem('story_spark_sidebar_collapsed') === 'true';
@@ -79,6 +82,58 @@ export function App() {
       return false;
     }
   });
+
+  const DEFAULT_SIDEBAR_WIDTH = 240;
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('story_spark_sidebar_width');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 180 && parsed <= 480) return parsed;
+      }
+    } catch {}
+    return DEFAULT_SIDEBAR_WIDTH;
+  });
+
+  const initialSidebarWidthRef = useRef<number>(sidebarWidth);
+
+  const handleSidebarResizeStart = () => {
+    initialSidebarWidthRef.current = sidebarWidth;
+  };
+
+  const handleSidebarResize = (deltaX: number) => {
+    const min = 180;
+    const maxAvailable = Math.max(min, window.innerWidth - 680);
+    const max = Math.min(480, maxAvailable);
+    const newWidth = Math.max(min, Math.min(max, Math.round(initialSidebarWidthRef.current + deltaX)));
+    setSidebarWidth(newWidth);
+  };
+
+  const handleSidebarResizeEnd = () => {
+    try {
+      localStorage.setItem('story_spark_sidebar_width', String(sidebarWidth));
+    } catch {}
+  };
+
+  const handleSidebarReset = () => {
+    setSidebarWidth(DEFAULT_SIDEBAR_WIDTH);
+    try {
+      localStorage.setItem('story_spark_sidebar_width', String(DEFAULT_SIDEBAR_WIDTH));
+    } catch {}
+  };
+
+  const handleSidebarStep = (step: number) => {
+    setSidebarWidth((prev) => {
+      const min = 180;
+      const maxAvailable = Math.max(min, window.innerWidth - 680);
+      const max = Math.min(480, maxAvailable);
+      const next = Math.max(min, Math.min(max, prev + step));
+      try {
+        localStorage.setItem('story_spark_sidebar_width', String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   const handleToggleSidebarCollapse = () => {
     setIsSidebarCollapsed((prev) => {
@@ -400,11 +455,27 @@ export function App() {
         }}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={handleToggleSidebarCollapse}
+        isMobileOpen={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
         currentTheme={currentTheme}
         isThemeActive={isThemeActive}
+        sidebarWidth={sidebarWidth}
       />
 
+      {!isSidebarCollapsed && (
+        <PanelResizer
+          id="sidebar-resizer"
+          label="Navigation Sidebar"
+          onResize={handleSidebarResize}
+          onResizeStart={handleSidebarResizeStart}
+          onResizeEnd={handleSidebarResizeEnd}
+          onReset={handleSidebarReset}
+          onStepChange={handleSidebarStep}
+        />
+      )}
+
       <EditorContainer
+        sidebarWidth={sidebarWidth}
         content={hist.state}
         onContentChange={handleChange}
         activeFileName={files.activeFileName}
@@ -465,6 +536,7 @@ export function App() {
         documentCategory={documentCategory}
         isSidebarCollapsed={isSidebarCollapsed}
         onToggleSidebarCollapse={handleToggleSidebarCollapse}
+        onToggleMobileSidebar={() => setIsMobileSidebarOpen((prev) => !prev)}
         isLoadingCurrentScene={isLoadingCurrentScene}
       />
 
@@ -551,6 +623,8 @@ export function App() {
           loadFile(p);
         }}
       />
+
+      <OfflineIndicator />
     </div>
   );
 }

@@ -13,6 +13,7 @@ import {
   Compass,
   Tag,
   Loader2,
+  Menu,
 } from 'lucide-react';
 import { Suggestion, LLMSettings, NovelCustomPrompts } from '../../types/index.ts';
 import {
@@ -47,6 +48,7 @@ interface SourcePaneProps {
   suggestionsCount?: number;
   isSidebarCollapsed?: boolean;
   onToggleSidebarCollapse?: () => void;
+  onToggleMobileSidebar?: () => void;
   loreEntries?: LoreEntry[];
   loreCharacters?: LoreEntry[];
   loreWorld?: LoreEntry[];
@@ -88,6 +90,7 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
   suggestionsCount,
   isSidebarCollapsed,
   onToggleSidebarCollapse,
+  onToggleMobileSidebar,
   loreEntries = [],
   loreCharacters = [],
   loreWorld = [],
@@ -461,6 +464,18 @@ export const SourcePane: React.FC<SourcePaneProps> = ({
       {/* Pane Header */}
       <div className="h-12 border-b border-stone-800 px-4 flex items-center justify-between bg-stone-950/40 flex-shrink-0">
         <div className="flex items-center space-x-2 truncate">
+          {onToggleMobileSidebar && (
+            <button
+              id="source-pane-mobile-drawer-btn"
+              type="button"
+              onClick={onToggleMobileSidebar}
+              title="Open Navigation Menu"
+              className="flex md:hidden items-center justify-center text-xs text-stone-300 hover:text-amber-300 bg-stone-800 hover:bg-stone-700 p-1.5 rounded transition border border-stone-700/60 mr-1 flex-shrink-0"
+            >
+              <Menu className="w-3.5 h-3.5 text-amber-400" />
+            </button>
+          )}
+
           {isSidebarCollapsed && onToggleSidebarCollapse && (
             <button
               id="source-pane-show-sidebar-btn"

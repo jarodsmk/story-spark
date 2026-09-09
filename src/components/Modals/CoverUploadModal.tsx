@@ -197,17 +197,17 @@ export const CoverUploadModal: React.FC<CoverUploadModalProps> = ({
   return (
     <div
       id="cover-upload-modal-backdrop"
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
         id="cover-upload-modal-container"
-        className="bg-stone-900 border border-stone-800 rounded-xl w-full max-w-2xl shadow-2xl flex flex-col overflow-hidden text-xs"
+        className="bg-stone-900 border border-stone-800 rounded-xl w-full max-w-2xl max-h-[96vh] sm:max-h-[90vh] shadow-2xl flex flex-col overflow-hidden text-xs"
       >
         {/* Header */}
-        <div className="h-14 border-b border-stone-800 px-5 flex items-center justify-between bg-stone-950/70">
+        <div className="h-14 border-b border-stone-800 px-4 sm:px-5 flex items-center justify-between bg-stone-950/70 flex-shrink-0">
           <div className="flex items-center space-x-2.5">
             <div className="p-1.5 bg-amber-500/10 text-amber-400 rounded-lg border border-amber-500/20">
               <ImageIcon className="w-4 h-4" />
@@ -215,7 +215,7 @@ export const CoverUploadModal: React.FC<CoverUploadModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="font-semibold text-stone-100 text-sm">Cover Picture</h2>
-                <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-500/30">
+                <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-500/30 truncate max-w-[140px] sm:max-w-[200px]">
                   {novel.title}
                 </span>
               </div>
@@ -235,7 +235,7 @@ export const CoverUploadModal: React.FC<CoverUploadModalProps> = ({
         </div>
 
         {/* Content Body */}
-        <div className="p-6 grid grid-cols-1 sm:grid-cols-12 gap-6 overflow-y-auto max-h-[75vh]">
+        <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-12 gap-6 overflow-y-auto max-h-[75vh]">
           {/* Left Column: Book Preview Mockup */}
           <div className="sm:col-span-5 flex flex-col items-center">
             <div className="text-[10px] uppercase font-semibold text-stone-400 tracking-wider mb-2 self-start flex items-center gap-1.5">

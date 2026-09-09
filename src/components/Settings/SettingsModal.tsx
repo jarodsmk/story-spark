@@ -38,8 +38,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-      <div className="bg-stone-900 border border-stone-800 rounded-lg w-full max-w-lg flex flex-col shadow-2xl text-xs max-h-[90vh]">
+    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-stone-900 border border-stone-800 rounded-lg w-full max-w-lg flex flex-col shadow-2xl text-xs max-h-[95vh] sm:max-h-[90vh]">
         <div className="h-10 border-b border-stone-800 px-3 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center space-x-1.5 font-medium text-stone-200">
             <Sliders className="w-3.5 h-3.5 text-amber-500" />

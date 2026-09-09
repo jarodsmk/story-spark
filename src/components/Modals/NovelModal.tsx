@@ -280,23 +280,28 @@ export const NovelModal: React.FC<NovelModalProps> = ({
   });
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4">
-      <div className="bg-stone-900 border border-stone-800 rounded-lg w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl text-xs overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-2 sm:p-4 backdrop-blur-xs">
+      <div className="bg-stone-900 border border-stone-800 rounded-lg w-full max-w-3xl max-h-[95vh] sm:max-h-[90vh] flex flex-col shadow-2xl text-xs overflow-hidden">
         {/* Header */}
-        <div className="h-12 border-b border-stone-800 px-4 flex items-center justify-between bg-stone-950/70">
-          <div className="flex items-center space-x-2">
-            <Library className="w-4 h-4 text-amber-500" />
-            <span className="font-semibold text-stone-100 text-sm">Author Studio: Novel Library</span>
-            <span className="text-[10px] bg-stone-800 text-stone-300 px-2 py-0.5 rounded-full font-mono">
-              {novels.length} {novels.length === 1 ? 'novel' : 'novels'}
-            </span>
+        <div className="h-auto py-2.5 sm:h-12 border-b border-stone-800 px-3 sm:px-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 bg-stone-950/70 flex-shrink-0">
+          <div className="flex items-center justify-between w-full sm:w-auto">
+            <div className="flex items-center space-x-2">
+              <Library className="w-4 h-4 text-amber-500" />
+              <span className="font-semibold text-stone-100 text-sm">Author Studio: Novel Library</span>
+              <span className="text-[10px] bg-stone-800 text-stone-300 px-2 py-0.5 rounded-full font-mono">
+                {novels.length} {novels.length === 1 ? 'novel' : 'novels'}
+              </span>
+            </div>
+            <button onClick={onClose} className="sm:hidden p-1 text-stone-400 hover:text-white rounded">
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="flex bg-stone-900 border border-stone-800 rounded p-0.5">
+          <div className="flex items-center justify-between w-full sm:w-auto gap-2">
+            <div className="flex flex-wrap bg-stone-900 border border-stone-800 rounded p-0.5 max-w-full overflow-x-auto">
               <button
                 onClick={() => { setActiveTab('list'); setEditingNovelId(null); }}
-                className={`px-3 py-1 rounded transition-colors ${
+                className={`px-2.5 sm:px-3 py-1 rounded transition-colors text-[11px] sm:text-xs ${
                   activeTab === 'list' ? 'bg-amber-600 text-white font-medium' : 'text-stone-400 hover:text-stone-200'
                 }`}
               >
@@ -305,7 +310,7 @@ export const NovelModal: React.FC<NovelModalProps> = ({
               <button
                 id="novel-modal-tab-prompts"
                 onClick={() => { setActiveTab('prompts'); setEditingNovelId(null); }}
-                className={`px-3 py-1 rounded transition-colors flex items-center gap-1.5 ${
+                className={`px-2.5 sm:px-3 py-1 rounded transition-colors flex items-center gap-1 text-[11px] sm:text-xs ${
                   activeTab === 'prompts' ? 'bg-amber-600 text-white font-medium' : 'text-stone-400 hover:text-stone-200'
                 }`}
               >
@@ -313,7 +318,7 @@ export const NovelModal: React.FC<NovelModalProps> = ({
               </button>
               <button
                 onClick={() => { setActiveTab('create'); setEditingNovelId(null); }}
-                className={`px-3 py-1 rounded transition-colors flex items-center gap-1 ${
+                className={`px-2.5 sm:px-3 py-1 rounded transition-colors flex items-center gap-1 text-[11px] sm:text-xs ${
                   activeTab === 'create' ? 'bg-amber-600 text-white font-medium' : 'text-stone-400 hover:text-stone-200'
                 }`}
               >
@@ -321,7 +326,7 @@ export const NovelModal: React.FC<NovelModalProps> = ({
               </button>
               <button
                 onClick={() => { setActiveTab('import'); setEditingNovelId(null); }}
-                className={`px-3 py-1 rounded transition-colors flex items-center gap-1 ${
+                className={`px-2.5 sm:px-3 py-1 rounded transition-colors flex items-center gap-1 text-[11px] sm:text-xs ${
                   activeTab === 'import' ? 'bg-amber-600 text-white font-medium' : 'text-stone-400 hover:text-stone-200'
                 }`}
               >
@@ -330,7 +335,7 @@ export const NovelModal: React.FC<NovelModalProps> = ({
               {editingNovelId && (
                 <button
                   onClick={() => setActiveTab('edit')}
-                  className={`px-3 py-1 rounded transition-colors ${
+                  className={`px-2.5 sm:px-3 py-1 rounded transition-colors text-[11px] sm:text-xs ${
                     activeTab === 'edit' ? 'bg-amber-600 text-white font-medium' : 'text-stone-400 hover:text-stone-200'
                   }`}
                 >
@@ -338,7 +343,7 @@ export const NovelModal: React.FC<NovelModalProps> = ({
                 </button>
               )}
             </div>
-            <button onClick={onClose} className="p-1 text-stone-400 hover:text-white rounded ml-2">
+            <button onClick={onClose} className="hidden sm:block p-1 text-stone-400 hover:text-white rounded ml-2">
               <X className="w-4 h-4" />
             </button>
           </div>

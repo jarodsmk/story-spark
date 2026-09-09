@@ -386,7 +386,7 @@ export const SuggestionsPane: React.FC<SuggestionsPaneProps> = ({
               type="button"
               onClick={onToggleCollapse}
               title="Collapse Suggestions & Passes pane"
-              className="p-1 text-stone-400 hover:text-amber-400 hover:bg-stone-800 rounded transition-colors ml-1"
+              className="hidden md:flex p-1 text-stone-400 hover:text-amber-400 hover:bg-stone-800 rounded transition-colors ml-1"
             >
               <PanelLeftClose className="w-3.5 h-3.5" />
             </button>
