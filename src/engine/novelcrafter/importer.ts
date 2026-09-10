@@ -80,10 +80,16 @@ export async function executeNovelCrafterImport(
       scenesImported++;
       if (i === 0) firstScenePath = filePath;
     }
-  } else {
+  } else if (parsed.scenes.length > 0 || parsed.rawNovelMd) {
     const fullContent = parsed.rawNovelMd || (parsed.scenes.map(s => s.content).join('\n\n---\n\n'));
     const filePath = `${scenesDir}01-novel.md`;
     await fs.writeFile(filePath, fullContent);
+    scenesImported = 1;
+    firstScenePath = filePath;
+  } else if (isNewNovel) {
+    // For a brand new novel with only bible/codex imported, provide a starter scene
+    const filePath = `${scenesDir}01-chapter-1.md`;
+    await fs.writeFile(filePath, `# Chapter 1\n\nBegin your novel here...`);
     scenesImported = 1;
     firstScenePath = filePath;
   }
@@ -111,6 +117,22 @@ export async function executeNovelCrafterImport(
       const filePath = `${worldDir}${item.suggestedFilename}`;
       await fs.writeFile(filePath, item.content);
       loreImported++;
+    }
+  }
+
+  // If firstScenePath is still empty, fall back to existing scene or first imported item
+  if (!firstScenePath) {
+    const existingScenes = await fs.listFiles(scenesDir);
+    if (existingScenes.length > 0) {
+      firstScenePath = existingScenes[0].path;
+    } else if (parsed.characters.length > 0 && options.importCharacters) {
+      firstScenePath = `${charDir}${parsed.characters[0].suggestedFilename}`;
+    } else if (parsed.locations.length > 0 && options.importWorldLore) {
+      firstScenePath = `${worldDir}${parsed.locations[0].suggestedFilename}`;
+    } else if (parsed.lore.length > 0 && options.importWorldLore) {
+      firstScenePath = `${worldDir}${parsed.lore[0].suggestedFilename}`;
+    } else {
+      firstScenePath = `${scenesDir}01-chapter-1.md`;
     }
   }
 

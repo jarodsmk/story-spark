@@ -200,6 +200,251 @@ function inferGenre(corpus: string): string {
 }
 
 /**
+ * Safely extracts the item's display name from a metadata.json object.
+ */
+export function extractNameFromMetadata(metadata: any): string {
+  if (!metadata || typeof metadata !== 'object') return '';
+
+  const directCandidates = [
+    metadata.name,
+    metadata.title,
+    metadata.label,
+    metadata.displayName,
+    metadata.entryName,
+    metadata.itemName,
+    metadata.header,
+  ];
+
+  for (const cand of directCandidates) {
+    if (typeof cand === 'string' && cand.trim()) {
+      return cand.trim();
+    }
+    if (cand && typeof cand === 'object') {
+      if (typeof cand.text === 'string' && cand.text.trim()) return cand.text.trim();
+      if (typeof cand.value === 'string' && cand.value.trim()) return cand.value.trim();
+      if (typeof cand.name === 'string' && cand.name.trim()) return cand.name.trim();
+    }
+  }
+
+  // Check nested containers (e.g. data, entry, item, attributes, properties, content)
+  const nestedKeys = ['data', 'entry', 'item', 'attributes', 'properties', 'content'];
+  for (const key of nestedKeys) {
+    if (metadata[key] && typeof metadata[key] === 'object') {
+      const subName = extractNameFromMetadata(metadata[key]);
+      if (subName) return subName;
+    }
+  }
+
+  return '';
+}
+
+/**
+ * Determines whether an entry represents a character, a location, or general world/lore.
+ */
+export function determineEntryCategory(
+  dir: string,
+  metadata: any,
+  content: string
+): 'character' | 'location' | 'lore' {
+  const normDir = dir.toLowerCase().replace(/\\/g, '/');
+
+  // 1. Check metadata category/type/kind/role
+  const metaCategory = String(
+    metadata?.category ||
+    metadata?.entryType ||
+    metadata?.type ||
+    metadata?.kind ||
+    metadata?.codexType ||
+    ''
+  ).toLowerCase();
+
+  if (
+    metaCategory === 'character' ||
+    metaCategory === 'characters' ||
+    metaCategory === 'person' ||
+    metaCategory === 'people' ||
+    metaCategory === 'actor' ||
+    metaCategory === 'cast'
+  ) {
+    return 'character';
+  }
+
+  if (
+    metaCategory === 'location' ||
+    metaCategory === 'locations' ||
+    metaCategory === 'place' ||
+    metaCategory === 'places' ||
+    metaCategory === 'setting' ||
+    metaCategory === 'settings'
+  ) {
+    return 'location';
+  }
+
+  if (
+    metaCategory === 'lore' ||
+    metaCategory === 'world' ||
+    metaCategory === 'item' ||
+    metaCategory === 'items' ||
+    metaCategory === 'concept' ||
+    metaCategory === 'concepts' ||
+    metaCategory === 'faction' ||
+    metaCategory === 'factions' ||
+    metaCategory === 'species' ||
+    metaCategory === 'event' ||
+    metaCategory === 'events' ||
+    metaCategory === 'magic'
+  ) {
+    return 'lore';
+  }
+
+  // If metadata specifies a character role
+  if (metadata?.role && typeof metadata.role === 'string') {
+    return 'character';
+  }
+
+  // 2. Check path segments in folder hierarchy
+  const segments = normDir.split('/').filter(Boolean);
+
+  if (
+    segments.some(s =>
+      s === 'characters' ||
+      s === 'character' ||
+      s === 'people' ||
+      s === 'persons' ||
+      s === 'cast' ||
+      s === 'protagonists' ||
+      s === 'antagonists'
+    )
+  ) {
+    return 'character';
+  }
+
+  if (
+    segments.some(s =>
+      s === 'locations' ||
+      s === 'location' ||
+      s === 'places' ||
+      s === 'settings' ||
+      s === 'cities' ||
+      s === 'regions' ||
+      s === 'realms'
+    )
+  ) {
+    return 'location';
+  }
+
+  if (
+    segments.some(s =>
+      s === 'lore' ||
+      s === 'world' ||
+      s === 'codex' ||
+      s === 'items' ||
+      s === 'factions' ||
+      s === 'concepts' ||
+      s === 'magic' ||
+      s === 'species' ||
+      s === 'organizations' ||
+      s === 'history' ||
+      s === 'notes'
+    )
+  ) {
+    return 'lore';
+  }
+
+  // 3. Check markdown content markers
+  if (content) {
+    if (/^#\s*Character:/i.test(content) || /-\s*\*\*Role\*\*:/i.test(content)) {
+      return 'character';
+    }
+    if (/^#\s*Location:/i.test(content) || /-\s*\*\*Atmosphere\*\*:/i.test(content)) {
+      return 'location';
+    }
+  }
+
+  return 'lore';
+}
+
+/**
+ * Formats markdown content cleanly with category header and metadata attributes.
+ */
+export function formatBibleItemContent(
+  category: 'character' | 'location' | 'lore',
+  name: string,
+  rawMarkdown: string,
+  metadata?: any
+): string {
+  const prefix = category === 'character' ? 'Character' : category === 'location' ? 'Location' : 'Lore';
+  let body = (rawMarkdown || '').trim();
+
+  // If rawMarkdown was empty, fall back to description/notes/summary in metadata
+  if (!body && metadata && typeof metadata === 'object') {
+    body = String(metadata.description || metadata.notes || metadata.summary || '').trim();
+  }
+
+  // Build metadata attribute bullets if not already present in the markdown body
+  const metaBullets: string[] = [];
+  if (metadata && typeof metadata === 'object') {
+    if (metadata.role && typeof metadata.role === 'string' && !body.toLowerCase().includes('role:')) {
+      metaBullets.push(`- **Role**: ${metadata.role.trim()}`);
+    }
+    if (metadata.status && typeof metadata.status === 'string' && !body.toLowerCase().includes('status:')) {
+      metaBullets.push(`- **Status**: ${metadata.status.trim()}`);
+    }
+    if (metadata.age && !body.toLowerCase().includes('age:')) {
+      metaBullets.push(`- **Age**: ${metadata.age}`);
+    }
+    if (metadata.atmosphere && typeof metadata.atmosphere === 'string' && !body.toLowerCase().includes('atmosphere:')) {
+      metaBullets.push(`- **Atmosphere**: ${metadata.atmosphere.trim()}`);
+    }
+    if (metadata.aliases) {
+      const aliasStr = Array.isArray(metadata.aliases) ? metadata.aliases.join(', ') : String(metadata.aliases);
+      if (aliasStr.trim() && !body.toLowerCase().includes('aliases:') && !body.toLowerCase().includes('alias:')) {
+        metaBullets.push(`- **Aliases**: ${aliasStr.trim()}`);
+      }
+    }
+    if (metadata.tags) {
+      const tagStr = Array.isArray(metadata.tags) ? metadata.tags.join(', ') : String(metadata.tags);
+      if (tagStr.trim() && !body.toLowerCase().includes('tags:')) {
+        metaBullets.push(`- **Tags**: ${tagStr.trim()}`);
+      }
+    }
+  }
+
+  const titleHeader = `# ${prefix}: ${name}`;
+  const metaBlock = metaBullets.length > 0 ? metaBullets.join('\n') + '\n\n' : '';
+
+  if (!body) {
+    return `${titleHeader}\n\n${metaBlock}No description provided.`.trim();
+  }
+
+  // If body starts with an H1 heading line, replace the first line with the canonical titleHeader
+  if (body.startsWith('#')) {
+    const firstNewline = body.indexOf('\n');
+    if (firstNewline === -1) {
+      return `${titleHeader}\n\n${metaBlock}`.trim();
+    }
+    const rest = body.slice(firstNewline + 1).trim();
+    return `${titleHeader}\n\n${metaBlock}${rest}`.trim();
+  }
+
+  return `${titleHeader}\n\n${metaBlock}${body}`.trim();
+}
+
+/**
+ * Ensures unique suggested filenames within a category.
+ */
+function makeUniqueFilename(baseSlug: string, used: Set<string>): string {
+  let fn = `${baseSlug}.md`;
+  let idx = 2;
+  while (used.has(fn)) {
+    fn = `${baseSlug}-${idx}.md`;
+    idx++;
+  }
+  used.add(fn);
+  return fn;
+}
+
+/**
  * Parses an uploaded NovelCrafter zip export.
  */
 export async function parseNovelCrafterZip(
@@ -233,38 +478,28 @@ export async function parseNovelCrafterZip(
     }
   }
 
-  // 2. Classify files
+  // 2. Discover novel.md manuscript and codex.html
   let novelMdContent: string | null = null;
   let codexHtmlContent: string | null = null;
-  const characterFiles: { path: string; name: string }[] = [];
-  const locationFiles: { path: string; name: string }[] = [];
-  const loreFiles: { path: string; name: string }[] = [];
 
   for (const rawPath of filePaths) {
-    const normalized = rawPath.slice(commonPrefix.length);
+    const normalized = rawPath.slice(commonPrefix.length).replace(/\\/g, '/');
     const lower = normalized.toLowerCase();
+    const baseName = lower.split('/').pop() || '';
 
-    if (lower === 'novel.md' || lower === 'manuscript.md' || lower.endsWith('/novel.md')) {
+    if (baseName === 'novel.md' || baseName === 'manuscript.md') {
       novelMdContent = await zip.file(rawPath)?.async('text') || '';
-    } else if (lower === 'codex.html' || lower.endsWith('/codex.html')) {
+    } else if (baseName === 'codex.html') {
       codexHtmlContent = await zip.file(rawPath)?.async('text') || '';
-    } else if (lower.startsWith('characters/') || lower.includes('/characters/')) {
-      const name = formatTitleFromFilename(normalized.split('/').pop() || '');
-      characterFiles.push({ path: rawPath, name });
-    } else if (lower.startsWith('locations/') || lower.includes('/locations/')) {
-      const name = formatTitleFromFilename(normalized.split('/').pop() || '');
-      locationFiles.push({ path: rawPath, name });
-    } else if (lower.startsWith('lore/') || lower.includes('/lore/')) {
-      const name = formatTitleFromFilename(normalized.split('/').pop() || '');
-      loreFiles.push({ path: rawPath, name });
     }
   }
 
-  // If novel.md wasn't matched directly, check for any root-level markdown file
+  // If novel.md wasn't matched directly, check for any root-level markdown file that isn't entry.md
   if (!novelMdContent) {
     for (const rawPath of filePaths) {
-      const normalized = rawPath.slice(commonPrefix.length);
-      if (!normalized.includes('/') && normalized.endsWith('.md')) {
+      const normalized = rawPath.slice(commonPrefix.length).replace(/\\/g, '/');
+      const lower = normalized.toLowerCase();
+      if (!normalized.includes('/') && lower.endsWith('.md') && lower !== 'entry.md') {
         novelMdContent = await zip.file(rawPath)?.async('text') || '';
         break;
       }
@@ -304,59 +539,229 @@ export async function parseNovelCrafterZip(
   }
 
   // 4. Process scenes
-  const scenes = splitNovelManuscript(novelMdContent || '', suggestedTitle);
-  const totalWordCount = scenes.reduce((acc, s) => acc + s.wordCount, 0);
+  let scenes: NovelCrafterScene[] = [];
+  if (novelMdContent) {
+    scenes = splitNovelManuscript(novelMdContent, suggestedTitle);
+  } else {
+    // Check if individual scene files exist under scenes/ or chapters/
+    const sceneFilePaths = filePaths.filter(p => {
+      const normalized = p.slice(commonPrefix.length).replace(/\\/g, '/').toLowerCase();
+      const base = normalized.split('/').pop() || '';
+      return (
+        (normalized.startsWith('scenes/') || normalized.includes('/scenes/') ||
+         normalized.startsWith('chapters/') || normalized.includes('/chapters/')) &&
+        base.endsWith('.md') &&
+        base !== 'entry.md'
+      );
+    });
 
-  // 5. Process characters
+    if (sceneFilePaths.length > 0) {
+      sceneFilePaths.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+      for (let i = 0; i < sceneFilePaths.length; i++) {
+        const rawP = sceneFilePaths[i];
+        const content = await zip.file(rawP)?.async('text') || '';
+        const base = rawP.split('/').pop() || `scene-${i + 1}`;
+        const title = formatTitleFromFilename(base);
+        const num = String(i + 1).padStart(2, '0');
+        const slug = sanitizeFilename(title.toLowerCase().replace(/[^a-z0-9]+/g, '-')) || `scene-${num}`;
+        scenes.push({
+          title,
+          suggestedFilename: `${num}-${slug}.md`,
+          content: content.trim().startsWith('#') ? content.trim() : `# ${title}\n\n${content.trim()}`,
+          wordCount: countWords(content),
+        });
+      }
+    }
+  }
+
+  // 5. Discover and iterate through EVERY subfolder for characters and world/lore items
   const characters: NovelCrafterBibleItem[] = [];
-  for (const cf of characterFiles) {
-    const text = (await zip.file(cf.path)?.async('text')) || '';
-    const slug = sanitizeFilename(cf.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')) || 'character';
-    const cleanContent = text.trim().startsWith('#') ? text.trim() : `# Character: ${cf.name}\n\n${text.trim()}`;
-    characters.push({
-      name: cf.name,
-      category: 'character',
-      suggestedFilename: `${slug}.md`,
-      content: cleanContent,
-      wordCount: countWords(cleanContent),
-    });
-  }
-
-  // 6. Process locations
   const locations: NovelCrafterBibleItem[] = [];
-  for (const lf of locationFiles) {
-    const text = (await zip.file(lf.path)?.async('text')) || '';
-    const slug = sanitizeFilename(lf.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')) || 'location';
-    const cleanContent = text.trim().startsWith('#') ? text.trim() : `# Location: ${lf.name}\n\n${text.trim()}`;
-    locations.push({
-      name: lf.name,
-      category: 'location',
-      suggestedFilename: `loc-${slug}.md`,
-      content: cleanContent,
-      wordCount: countWords(cleanContent),
-    });
+  const lore: NovelCrafterBibleItem[] = [];
+
+  const usedCharFilenames = new Set<string>();
+  const usedLocFilenames = new Set<string>();
+  const usedLoreFilenames = new Set<string>();
+  const processedRawPaths = new Set<string>();
+
+  // Group all files by directory (relative to commonPrefix)
+  const filesByDir = new Map<string, string[]>();
+  for (const rawPath of filePaths) {
+    const normalized = rawPath.slice(commonPrefix.length).replace(/\\/g, '/');
+    const lastSlash = normalized.lastIndexOf('/');
+    const dir = lastSlash === -1 ? '' : normalized.slice(0, lastSlash);
+    if (!filesByDir.has(dir)) {
+      filesByDir.set(dir, []);
+    }
+    filesByDir.get(dir)!.push(rawPath);
   }
 
-  // 7. Process lore
-  const lore: NovelCrafterBibleItem[] = [];
-  for (const rf of loreFiles) {
-    const text = (await zip.file(rf.path)?.async('text')) || '';
-    const slug = sanitizeFilename(rf.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')) || 'lore';
-    const cleanContent = text.trim().startsWith('#') ? text.trim() : `# Lore: ${rf.name}\n\n${text.trim()}`;
-    lore.push({
-      name: rf.name,
-      category: 'lore',
-      suggestedFilename: `lore-${slug}.md`,
-      content: cleanContent,
-      wordCount: countWords(cleanContent),
+  // Iterate through EVERY subfolder
+  for (const [dir, dirRawPaths] of filesByDir.entries()) {
+    if (!dir) continue; // Skip root folder for entry.md subfolder iteration
+
+    // Locate entry.md (or entry.markdown) in this subfolder
+    let entryPath = dirRawPaths.find(p => {
+      const base = p.replace(/\\/g, '/').split('/').pop()?.toLowerCase();
+      return base === 'entry.md' || base === 'entry.markdown';
     });
+
+    // Locate metadata.json in this subfolder
+    const metaPath = dirRawPaths.find(p => {
+      const base = p.replace(/\\/g, '/').split('/').pop()?.toLowerCase();
+      return base === 'metadata.json';
+    });
+
+    // If no entry.md was named exactly entry.md, but metadata.json exists, check for any markdown file in that directory
+    if (!entryPath && metaPath) {
+      entryPath = dirRawPaths.find(p => {
+        const base = p.replace(/\\/g, '/').split('/').pop()?.toLowerCase();
+        return base?.endsWith('.md') || base?.endsWith('.markdown');
+      });
+    }
+
+    // If either entry.md or metadata.json is found in this subfolder, process as an item
+    if (entryPath || metaPath) {
+      if (entryPath) processedRawPaths.add(entryPath);
+      if (metaPath) processedRawPaths.add(metaPath);
+
+      let metadata: any = null;
+      if (metaPath) {
+        try {
+          const metaText = await zip.file(metaPath)?.async('text');
+          if (metaText) {
+            metadata = JSON.parse(metaText);
+          }
+        } catch (err) {
+          console.warn(`Failed to parse metadata.json at ${metaPath}:`, err);
+        }
+      }
+
+      const rawMarkdown = entryPath ? (await zip.file(entryPath)?.async('text') || '') : '';
+
+      // Determine item name: metadata.json takes precedence
+      let itemName = extractNameFromMetadata(metadata);
+
+      if (!itemName && rawMarkdown) {
+        const h1Match = rawMarkdown.match(/^#\s+(.+)$/m);
+        if (h1Match) {
+          const clean = h1Match[1].replace(/^(character|location|lore|world|item|idea):\s*/i, '').trim();
+          if (clean && clean.toLowerCase() !== 'entry') {
+            itemName = clean;
+          }
+        }
+      }
+
+      if (!itemName) {
+        const leafDir = dir.split('/').pop() || 'item';
+        itemName = formatTitleFromFilename(leafDir);
+      }
+
+      // Determine item category (character, location, or lore)
+      const category = determineEntryCategory(dir, metadata, rawMarkdown);
+
+      // Clean & format markdown content with header and attributes
+      const formattedContent = formatBibleItemContent(category, itemName, rawMarkdown, metadata);
+      const baseSlug = sanitizeFilename(itemName.toLowerCase().replace(/[^a-z0-9]+/g, '-')) || category;
+
+      if (category === 'character') {
+        const suggestedFilename = makeUniqueFilename(baseSlug, usedCharFilenames);
+        characters.push({
+          name: itemName,
+          category: 'character',
+          suggestedFilename,
+          content: formattedContent,
+          wordCount: countWords(formattedContent),
+        });
+      } else if (category === 'location') {
+        const suggestedFilename = makeUniqueFilename(`loc-${baseSlug}`, usedLocFilenames);
+        locations.push({
+          name: itemName,
+          category: 'location',
+          suggestedFilename,
+          content: formattedContent,
+          wordCount: countWords(formattedContent),
+        });
+      } else {
+        const suggestedFilename = makeUniqueFilename(`lore-${baseSlug}`, usedLoreFilenames);
+        lore.push({
+          name: itemName,
+          category: 'lore',
+          suggestedFilename,
+          content: formattedContent,
+          wordCount: countWords(formattedContent),
+        });
+      }
+    }
   }
+
+  // 6. Support flat archives (e.g. characters/Aria.md, locations/Spire.md, lore/Runes.md)
+  for (const rawPath of filePaths) {
+    if (processedRawPaths.has(rawPath)) continue;
+
+    const normalized = rawPath.slice(commonPrefix.length).replace(/\\/g, '/');
+    const lower = normalized.toLowerCase();
+    const baseName = lower.split('/').pop() || '';
+
+    // Ignore novel.md, codex.html, or non-markdown files
+    if (
+      baseName === 'novel.md' ||
+      baseName === 'manuscript.md' ||
+      baseName === 'codex.html' ||
+      baseName === 'entry.md' ||
+      !baseName.endsWith('.md')
+    ) {
+      continue;
+    }
+
+    const name = formatTitleFromFilename(baseName);
+    const baseSlug = sanitizeFilename(name.toLowerCase().replace(/[^a-z0-9]+/g, '-')) || 'item';
+    const text = await zip.file(rawPath)?.async('text') || '';
+
+    if (lower.startsWith('characters/') || lower.includes('/characters/')) {
+      const cleanContent = text.trim().startsWith('#') ? text.trim() : `# Character: ${name}\n\n${text.trim()}`;
+      const suggestedFilename = makeUniqueFilename(baseSlug, usedCharFilenames);
+      characters.push({
+        name,
+        category: 'character',
+        suggestedFilename,
+        content: cleanContent,
+        wordCount: countWords(cleanContent),
+      });
+    } else if (lower.startsWith('locations/') || lower.includes('/locations/')) {
+      const cleanContent = text.trim().startsWith('#') ? text.trim() : `# Location: ${name}\n\n${text.trim()}`;
+      const suggestedFilename = makeUniqueFilename(`loc-${baseSlug}`, usedLocFilenames);
+      locations.push({
+        name,
+        category: 'location',
+        suggestedFilename,
+        content: cleanContent,
+        wordCount: countWords(cleanContent),
+      });
+    } else if (lower.startsWith('lore/') || lower.includes('/lore/') || lower.startsWith('world/') || lower.includes('/world/')) {
+      const cleanContent = text.trim().startsWith('#') ? text.trim() : `# Lore: ${name}\n\n${text.trim()}`;
+      const suggestedFilename = makeUniqueFilename(`lore-${baseSlug}`, usedLoreFilenames);
+      lore.push({
+        name,
+        category: 'lore',
+        suggestedFilename,
+        content: cleanContent,
+        wordCount: countWords(cleanContent),
+      });
+    }
+  }
+
+  // 7. Calculate totals & genre
+  const sceneWords = scenes.reduce((acc, s) => acc + s.wordCount, 0);
+  const bibleWords = [...characters, ...locations, ...lore].reduce((acc, item) => acc + item.wordCount, 0);
+  const totalWordCount = sceneWords > 0 ? sceneWords : bibleWords;
 
   // Infer genre
   const combinedCorpus = [
     novelMdContent?.slice(0, 5000) || '',
     lore.map(l => l.content).join(' '),
     characters.map(c => c.content).join(' '),
+    locations.map(loc => loc.content).join(' '),
   ].join(' ');
   const suggestedGenre = inferGenre(combinedCorpus);
 
