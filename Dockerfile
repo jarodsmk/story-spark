@@ -17,6 +17,7 @@ ENV NODE_ENV=production
 ENV PORT=3001
 ENV MONGODB_URI=mongodb://mongodb:27017
 ENV MONGODB_DB_NAME=storyspark
+ENV RUN_STANDALONE_SERVER=true
 
 # Install nginx & gettext for serving frontend and reverse proxying
 RUN apk add --no-cache nginx
@@ -33,6 +34,7 @@ COPY nginx.conf /etc/nginx/http.d/default.conf
 
 # Add startup script to run both Node MongoDB backend and Nginx in container
 RUN echo '#!/bin/sh' > /app/start.sh && \
+    echo 'export RUN_STANDALONE_SERVER=true' >> /app/start.sh && \
     echo 'npx tsx src/server/index.ts &' >> /app/start.sh && \
     echo 'nginx -g "daemon off;"' >> /app/start.sh && \
     chmod +x /app/start.sh

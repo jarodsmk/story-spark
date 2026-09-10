@@ -378,10 +378,15 @@ export class LocalDatabase {
       if (resp.ok) {
         return await resp.json();
       }
+      const errBody = await resp.json().catch(() => null);
+      return {
+        success: false,
+        connected: false,
+        error: errBody?.error || `HTTP ${resp.status} ${resp.statusText || 'Server Error'}`,
+      };
     } catch (err: any) {
-      return { success: false, connected: false, error: err.message };
+      return { success: false, connected: false, error: err.message || 'Network request failed' };
     }
-    return { success: false, connected: false, error: 'Reconnection request failed' };
   }
 
   async syncToRemote(files: Array<{ path: string; content: string }>): Promise<{ success: boolean; syncedFilesCount: number; syncedSettingsCount: number }> {

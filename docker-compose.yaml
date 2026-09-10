@@ -24,6 +24,9 @@ services:
       - MONGODB_URI=mongodb://mongodb:27017
       - MONGODB_DB_NAME=storyspark
       - PORT=3001
+      - RUN_STANDALONE_SERVER=true
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - mongodb
 

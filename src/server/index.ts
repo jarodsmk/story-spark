@@ -467,8 +467,13 @@ app.put('/api/settings/:key', async (req, res) => {
 
 export { app, getDb, seedDefaultDataIfEmpty };
 
-if (process.env.NODE_ENV !== 'test' && !process.env.VITEST && process.env.RUN_STANDALONE_SERVER) {
-  app.listen(port, () => {
+const isDirectRun = Boolean(
+  process.env.RUN_STANDALONE_SERVER === 'true' ||
+  (process.argv[1] && /server[\\/]index\.(ts|js|mjs)$/.test(process.argv[1]))
+);
+
+if (process.env.NODE_ENV !== 'test' && !process.env.VITEST && isDirectRun) {
+  app.listen(Number(port), '0.0.0.0', () => {
     console.log(`StorySpark MongoDB backend listening on port ${port}`);
   });
 }

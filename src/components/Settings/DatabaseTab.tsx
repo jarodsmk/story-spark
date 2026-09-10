@@ -32,12 +32,13 @@ export const DatabaseTab: React.FC = () => {
   const handleReconnect = async (e: React.FormEvent) => {
     e.preventDefault();
     setSyncFeedback(null);
-    const success = await reconnect(customUri || undefined, customDbName || undefined);
-    if (success) {
+    const result = await reconnect(customUri || undefined, customDbName || undefined);
+    if (result.connected) {
       setSyncFeedback('Connected to MongoDB database successfully!');
       setShowConfig(false);
     } else {
-      setSyncFeedback('Reconnection failed. Running in resilient local storage mode.');
+      const detail = result.error ? `: ${result.error}` : '';
+      setSyncFeedback(`Reconnection failed${detail}. Running in resilient local storage mode.`);
     }
   };
 
@@ -182,9 +183,14 @@ export const DatabaseTab: React.FC = () => {
                 type="text"
                 value={customUri}
                 onChange={(e) => setCustomUri(e.target.value)}
-                placeholder="mongodb+srv://username:password@cluster.mongodb.net/..."
-                className="w-full bg-stone-900 border border-stone-700 rounded px-2.5 py-1.5 text-xs text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500"
+                placeholder="e.g. mongodb://mongodb:27017 or mongodb://host.docker.internal:27017"
+                className="w-full bg-stone-900 border border-stone-700 rounded px-2.5 py-1.5 text-xs text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500 font-mono"
               />
+              <div className="mt-1 text-[10px] text-stone-500 space-y-0.5">
+                <div>• In Docker Compose stack: <code className="text-amber-400/90 font-mono">mongodb://mongodb:27017</code></div>
+                <div>• From container to host machine: <code className="text-amber-400/90 font-mono">mongodb://host.docker.internal:27017</code></div>
+                <div>• Native / standalone: <code className="text-amber-400/90 font-mono">mongodb://127.0.0.1:27017?directConnection=true</code></div>
+              </div>
             </div>
 
             <div>

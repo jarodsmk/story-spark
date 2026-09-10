@@ -40,7 +40,7 @@ export function useMongoDbStatus() {
     try {
       const res = await db.reconnectDb(mongoUri, dbName);
       await checkStatus();
-      return !!res.connected;
+      return res;
     } finally {
       setIsReconnecting(false);
     }
